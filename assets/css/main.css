@@ -1,5 +1,3 @@
-@import "locomotive-scroll/dist/locomotive-scroll.css";
-
 /**
     RESET STYLES
 */
@@ -91,43 +89,27 @@ h6 {
   Variables
 */
 :root {
-  --color-white: #ffffff;
-  --color-black: #000000;
-  --color-dark: #111111;
-  --color-light: #faf6ef;
-  --color-blue: #3291ff;
-  --color-yellow: #fcbe4f;
-  --color-orange: #ff8922;
+  --color-white: #f9f9f9;
+  --color-black: #221e1f;
+  --color-blue: #71bff6;
+  --color-pink: #ffa9c9;
+  --color-grey: #c5cdcf;
 
-  --columns: 12;
-  --rows: 1;
-  --gutter-x: 3.31vw;
-  --gutter-y: 5.55vh;
-  --font-size: 2.6666666667vw;
-  --grid-gap: 1.655vw;
-  --grid-space: calc((100% + -4 * var(--grid-gap)) / 12);
-}
+  /* Desktop Grid */
+  --grid-col-1: 16.7%;
+  --grid-col-2: 9.73%;
+  --grid-col-3: 38.85%;
+  --grid-col-4: 34.73%;
+  --grid-margin: 50px;
+  --grid-gap: 0px; /* Ajustez si nécessaire */
 
-html {
-  font-size: 2.6666666667vw;
-  font-synthesis: none;
-  -webkit-font-smoothing: antialiased;
-}
+  /* Mobile Grid */
+  --grid-col-mobile-1: 20%;
+  --grid-col-mobile-2: 40%;
+  --grid-col-mobile-3: 40%;
 
-html {
-  font-size: 10px;
-}
-
-@media only screen and (min-width: 450px) {
-  html {
-    font-size: 12px;
-  }
-}
-
-@media only screen and (min-width: 1024px) {
-  html {
-    font-size: 0.625vw;
-  }
+  --font-inter: "Inter Tight", sans-serif;
+  --font-cormorant: "Cormorant Garamond", serif;
 }
 
 /**
@@ -146,56 +128,6 @@ html {
   gap: var(--grid-gap);
 }
 
-/**
-  Typography
-*/
-.heading-1 {
-  font-family: "Neutronic", serif;
-  font-weight: 900;
-  font-size: 5.5rem;
-  letter-spacing: -0.02em;
-  line-height: 1.05;
-}
-
-.heading-2 {
-  font-family: "Neutronic", serif;
-  font-weight: 900;
-  font-size: 3.5rem;
-  letter-spacing: -0.03em;
-  line-height: 1.12;
-}
-
-.text-body-1 {
-  font-family: "Acumin Pro", sans-serif;
-  font-weight: 400;
-  font-size: 2rem;
-  letter-spacing: -0.03em;
-  line-height: 1.3;
-}
-
-.text-body-2 {
-  font-family: "Acumin Pro", sans-serif;
-  font-weight: 400;
-  font-size: 1.4rem;
-  letter-spacing: -0.01em;
-  line-height: 1;
-}
-
-@media only screen and (min-width: 1024px) {
-  .heading-1 {
-    font-size: 14.675rem;
-  }
-  .heading-2 {
-    font-size: 6.775rem;
-  }
-  .text-body-1 {
-    font-size: 3.2rem;
-  }
-  .text-body-2 {
-    font-size: 2.4rem;
-  }
-}
-
 /* 
   Utils
 */
@@ -210,4 +142,165 @@ html {
 
 .js-char {
   display: inline-block;
+}
+
+.gs-dev-tools {
+  z-index: 9999;
+}
+
+/* 
+  Grid System
+*/
+
+/* Container principal */
+.grid-container {
+  width: 100%;
+  padding: 0 var(--grid-margin);
+  box-sizing: border-box;
+}
+
+/* Grid Desktop */
+.grid {
+  display: grid;
+  grid-template-columns:
+    var(--grid-col-1)
+    var(--grid-col-2)
+    var(--grid-col-3)
+    var(--grid-col-4);
+  gap: var(--grid-gap);
+  width: 100%;
+}
+
+/* Classes utilitaires pour spans de colonnes - Desktop */
+.col-span-1 {
+  grid-column: span 1;
+}
+.col-span-2 {
+  grid-column: span 2;
+}
+.col-span-3 {
+  grid-column: span 3;
+}
+.col-span-4 {
+  grid-column: span 4;
+}
+
+/* Classes pour démarrer à une colonne spécifique - Desktop */
+.col-start-1 {
+  grid-column-start: 1;
+}
+.col-start-2 {
+  grid-column-start: 2;
+}
+.col-start-3 {
+  grid-column-start: 3;
+}
+.col-start-4 {
+  grid-column-start: 4;
+}
+
+/* Classes pour finir à une colonne spécifique - Desktop */
+.col-end-2 {
+  grid-column-end: 2;
+}
+.col-end-3 {
+  grid-column-end: 3;
+}
+.col-end-4 {
+  grid-column-end: 4;
+}
+.col-end-5 {
+  grid-column-end: 5;
+}
+
+/* Grid Mobile */
+@media (max-width: 768px) {
+  :root {
+    --grid-margin: 20px; /* Marges réduites sur mobile */
+  }
+
+  .grid {
+    grid-template-columns:
+      var(--grid-col-mobile-1)
+      var(--grid-col-mobile-2)
+      var(--grid-col-mobile-3);
+  }
+
+  /* Classes utilitaires pour spans de colonnes - Mobile */
+  .col-span-1,
+  .col-span-2,
+  .col-span-3,
+  .col-span-4 {
+    grid-column: span 3; /* Par défaut pleine largeur sur mobile */
+  }
+
+  .mobile\:col-span-1 {
+    grid-column: span 1;
+  }
+  .mobile\:col-span-2 {
+    grid-column: span 2;
+  }
+  .mobile\:col-span-3 {
+    grid-column: span 3;
+  }
+
+  /* Classes pour démarrer à une colonne spécifique - Mobile */
+  .mobile\:col-start-1 {
+    grid-column-start: 1;
+  }
+  .mobile\:col-start-2 {
+    grid-column-start: 2;
+  }
+  .mobile\:col-start-3 {
+    grid-column-start: 3;
+  }
+
+  /* Classes pour finir à une colonne spécifique - Mobile */
+  .mobile\:col-end-2 {
+    grid-column-end: 2;
+  }
+  .mobile\:col-end-3 {
+    grid-column-end: 3;
+  }
+  .mobile\:col-end-4 {
+    grid-column-end: 4;
+  }
+}
+
+/* Grille de visualisation pour le développement (à retirer en production) */
+.grid-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  pointer-events: none;
+  z-index: 9999;
+  padding: 0 var(--grid-margin);
+}
+
+.grid-overlay-inner {
+  height: 100%;
+  display: grid;
+  grid-template-columns:
+    var(--grid-col-1)
+    var(--grid-col-2)
+    var(--grid-col-3)
+    var(--grid-col-4);
+  gap: var(--grid-gap);
+}
+
+.grid-overlay-col {
+  background: rgba(255, 0, 0, 0.1);
+  border-left: 1px solid rgba(255, 0, 0, 0.3);
+  border-right: 1px solid rgba(255, 0, 0, 0.3);
+}
+
+@media (max-width: 768px) {
+  .grid-overlay-inner {
+    grid-template-columns:
+      var(--grid-col-mobile-1)
+      var(--grid-col-mobile-2)
+      var(--grid-col-mobile-3);
+  }
 }

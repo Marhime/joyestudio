@@ -1,0 +1,291 @@
+/* assets/css/typography.css */
+
+/* ============================================
+   SYSTÈME DE BASE FLUIDE REM
+   ============================================ */
+
+html {
+  font-size: 2.6666666667vw; /* Base fluide pour très petits écrans */
+  font-synthesis: none;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+/* Mobile (375px+) : 1rem = 10px */
+@media only screen and (min-width: 375px) {
+  html {
+    font-size: 10px;
+  }
+}
+
+/* Tablet (768px+) : 1rem = 12px */
+@media only screen and (min-width: 768px) {
+  html {
+    font-size: 12px;
+  }
+}
+
+/* Desktop (1024px+) : 1rem = 0.625vw (fluide) */
+/* À 1920px : 1rem = 12px */
+@media only screen and (min-width: 1024px) {
+  html {
+    font-size: 0.625vw;
+  }
+}
+
+/* 4K et plus (2560px+) : Cap à 16px pour éviter trop gros */
+@media only screen and (min-width: 2560px) {
+  html {
+    font-size: 16px;
+  }
+}
+
+/* ============================================
+   TYPE 1 - MOBILE
+   ============================================ */
+
+.t1-h1,
+.type-1 h1 {
+  font-size: 13.5rem; /* 135px mobile */
+  line-height: 1.21; /* 163/135 */
+  letter-spacing: -0.05em;
+  font-weight: 700;
+  margin: 0;
+}
+
+.t1-h2,
+.type-1 h2 {
+  font-size: 4rem; /* 40px mobile */
+  line-height: 1.2; /* 48/40 */
+  letter-spacing: -0.05em;
+  font-weight: 700;
+  margin: 0;
+}
+
+.t1-h3,
+.type-1 h3 {
+  font-size: 3.3rem; /* 33px mobile */
+  line-height: 1.21; /* 40/33 */
+  letter-spacing: -0.08em; /* Design spec mobile */
+  font-weight: 700;
+  margin: 0;
+}
+
+.t1-h4,
+.type-1 h4 {
+  font-size: 2.5rem; /* 25px mobile */
+  line-height: 1.2; /* 30/25 */
+  letter-spacing: -0.05em;
+  font-weight: 700;
+  margin: 0;
+}
+
+.t1-body-accent,
+.type-1 .body-accent {
+  font-size: 2.4rem; /* 24px mobile */
+  line-height: 1.21; /* 29/24 */
+  letter-spacing: -0.03em;
+  font-weight: 500;
+  margin: 0;
+}
+
+.t1-body,
+.type-1 p,
+.type-1 .body {
+  font-size: 1.1rem; /* 11px mobile */
+  line-height: 1.18; /* 13/11 */
+  letter-spacing: -0.03em;
+  font-weight: 400;
+  margin: 0;
+}
+
+/* ============================================
+   TYPE 1 - DESKTOP (1024px+)
+   ============================================ */
+
+@media only screen and (min-width: 1024px) {
+  .t1-h1,
+  .type-1 h1 {
+    font-size: 34.5rem; /* 345px desktop */
+    line-height: 1.21; /* 417/345 */
+    letter-spacing: -0.05em;
+  }
+
+  .t1-h2,
+  .type-1 h2 {
+    font-size: 15.5rem; /* 155px desktop */
+    line-height: 1.21; /* 187/155 */
+  }
+
+  .t1-h3,
+  .type-1 h3 {
+    font-size: 11rem; /* 110px desktop */
+    line-height: 0.91; /* 100/110 */
+    letter-spacing: -0.05em; /* Retour à -5% sur desktop */
+  }
+
+  .t1-h4,
+  .type-1 h4 {
+    font-size: 6.6rem; /* 66px desktop */
+    line-height: 1.21; /* 80/66 */
+  }
+
+  .t1-body-accent,
+  .type-1 .body-accent {
+    font-size: 2.4rem; /* Reste 24px */
+    line-height: 1.21; /* 29/24 */
+  }
+
+  .t1-body,
+  .type-1 p,
+  .type-1 .body {
+    font-size: 1.8rem; /* 18px desktop */
+    line-height: 1.21; /* 21.8/18 */
+  }
+}
+
+/* ============================================
+   TYPE 2 - MOBILE
+   ============================================ */
+
+.t2-h1,
+.type-2 h1 {
+  font-size: 18.7rem; /* 187px mobile */
+  line-height: 1.21; /* 226/187 */
+  letter-spacing: -0.05em;
+  font-weight: 700;
+  margin: 0;
+}
+
+.t2-h2,
+.type-2 h2 {
+  font-size: 5.2rem; /* 52px mobile */
+  line-height: 1.21; /* 63/52 */
+  letter-spacing: -0.05em;
+  font-weight: 700;
+  margin: 0;
+}
+
+.t2-h3,
+.type-2 h3 {
+  font-size: 4.5rem; /* 45px mobile */
+  line-height: 2.22; /* 100/45 */
+  letter-spacing: -0.05em;
+  font-weight: 700;
+  margin: 0;
+}
+
+.t2-h4,
+.type-2 h4 {
+  font-size: 3.5rem; /* 35px mobile */
+  line-height: 1.2; /* 42/35 */
+  letter-spacing: -0.05em;
+  font-weight: 700;
+  margin: 0;
+}
+
+.t2-body-accent,
+.type-2 .body-accent {
+  font-size: 1rem; /* 10px mobile */
+  line-height: 1.9; /* 19/10 */
+  letter-spacing: -0.08em;
+  font-weight: 500;
+  margin: 0;
+}
+
+/* ============================================
+   TYPE 2 - DESKTOP (1024px+)
+   ============================================ */
+
+@media only screen and (min-width: 1024px) {
+  .t2-h1,
+  .type-2 h1 {
+    font-size: 43.5rem; /* 435px desktop */
+    line-height: 1.21; /* 526.8/435 */
+  }
+
+  .t2-h2,
+  .type-2 h2 {
+    font-size: 21rem; /* 210px desktop */
+    line-height: 1.21; /* 254.3/210 */
+  }
+
+  .t2-h3,
+  .type-2 h3 {
+    font-size: 15.2rem; /* 152px desktop */
+    line-height: 0.66; /* 100/152 */
+  }
+
+  .t2-h4,
+  .type-2 h4 {
+    font-size: 8.3rem; /* 83px desktop */
+    line-height: 1.21; /* 100.5/83 */
+  }
+
+  .t2-body-accent,
+  .type-2 .body-accent {
+    font-size: 2.1rem; /* 21px desktop */
+    line-height: 0.9; /* 19/21 */
+  }
+}
+
+/* ============================================
+   CLASSES UTILITAIRES
+   ============================================ */
+
+/* Tracking */
+.tracking-tight {
+  letter-spacing: -0.05em;
+}
+
+.tracking-normal {
+  letter-spacing: -0.03em;
+}
+
+.tracking-wide {
+  letter-spacing: -0.08em;
+}
+
+/* Font weights */
+.font-light {
+  font-weight: 300;
+}
+
+.font-normal {
+  font-weight: 400;
+}
+
+.font-medium {
+  font-weight: 500;
+}
+
+.font-semibold {
+  font-weight: 600;
+}
+
+.font-bold {
+  font-weight: 700;
+}
+
+/* Reset marges pour éviter conflits */
+.type-1 *,
+.type-2 * {
+  margin: 0;
+}
+
+/* ============================================
+   OPTIMISATIONS GLOBALES
+   ============================================ */
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6,
+p {
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}

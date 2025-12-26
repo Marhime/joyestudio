@@ -4,9 +4,7 @@
     data-scroll-offset="0%, 100%"
     data-scroll-event-progress="ProcessPageEvent"
     ref="processSectionRef"
-    :class="{
-      'process-section': true,
-    }"
+    class="process-section"
   >
     <div
       data-scroll
@@ -469,7 +467,7 @@ onUnmounted(() => {
 }
 
 .title {
-  grid-column: 2 / 12;
+  grid-column: 3 / 11;
 }
 
 .subtitle {

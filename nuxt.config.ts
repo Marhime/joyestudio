@@ -2,8 +2,7 @@
 export default defineNuxtConfig({
   compatibilityDate: "2025-07-15",
   devtools: { enabled: true },
-
-  css: ["~/assets/css/main.css"],
+  css: ["~/assets/css/main.css", "~/assets/css/typography.css"],
 
   app: {
     head: {
@@ -16,4 +15,6 @@ export default defineNuxtConfig({
     },
     pageTransition: { name: "page", mode: "out-in" },
   },
+
+  modules: ["@nuxt/fonts", "@nuxt/image"],
 });
