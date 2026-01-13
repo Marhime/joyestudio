@@ -18,6 +18,7 @@
         </div>
         <div class="logo-left">
           <svg
+            ref="logoLeftPlaceholderRef"
             class="svg-placeholder"
             width="573"
             height="395"
@@ -71,6 +72,7 @@
         </div>
         <div class="logo-right">
           <svg
+            ref="logoRightPlaceholderRef"
             class="svg-placeholder"
             width="840"
             height="264"
@@ -149,6 +151,8 @@ const { $gsap, $Flip } = useNuxtApp();
 const sectionRef = ref<HTMLElement | null>(null);
 const logoLeftRef = ref<HTMLElement | null>(null);
 const logoRightRef = ref<HTMLElement | null>(null);
+const logoLeftPlaceholderRef = ref<HTMLElement | null>(null);
+const logoRightPlaceholderRef = ref<HTMLElement | null>(null);
 
 onMounted(() => {
   nextTick(() => {
@@ -163,6 +167,9 @@ function setupFlipAnimation() {
   const finalRightContainer = document.querySelector(
     "[header-logo-right]"
   ) as HTMLElement | null;
+  const initialLeftRect = logoLeftPlaceholderRef.value?.getBoundingClientRect();
+  const initialRightRect =
+    logoRightPlaceholderRef.value?.getBoundingClientRect();
 
   if (!logoLeftRef.value || !logoRightRef.value) return;
 
@@ -170,6 +177,25 @@ function setupFlipAnimation() {
     console.warn("Header logo targets not found");
     return;
   }
+
+  // make the element fixed position to prepare for FLIP animation
+  $gsap.set(logoLeftRef.value, {
+    position: "fixed",
+    top: initialLeftRect?.top,
+    left: initialLeftRect?.left,
+    width: initialLeftRect?.width,
+    height: initialLeftRect?.height,
+    zIndex: 1000,
+  });
+
+  $gsap.set(logoRightRef.value, {
+    position: "fixed",
+    top: initialRightRect?.top,
+    left: initialRightRect?.left,
+    width: initialRightRect?.width,
+    height: initialRightRect?.height,
+    zIndex: 1000,
+  });
 
   // Create a scrubbed timeline on first scroll enter so the FLIP.fit
   // animations are driven by the section's scroll without affecting
@@ -200,7 +226,7 @@ function setupFlipAnimation() {
 
     tl.add($Flip.fit(logoLeftRef.value, finalStateLeft, flipConfig)).add(
       $Flip.fit(logoRightRef.value, finalStateRight, flipConfig),
-      "<"
+      0
     );
   };
 
