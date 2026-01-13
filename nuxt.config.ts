@@ -2,7 +2,7 @@
 export default defineNuxtConfig({
   compatibilityDate: "2025-07-15",
   devtools: { enabled: true },
-  css: ["~/assets/css/main.css", "~/assets/css/typography.css"],
+  css: ["~/assets/scss/style.scss"],
 
   app: {
     head: {
@@ -14,6 +14,17 @@ export default defineNuxtConfig({
       ],
     },
     pageTransition: { name: "page", mode: "out-in" },
+  },
+
+  vite: {
+    css: {
+      preprocessorOptions: {
+        scss: {
+          // additionalData injects these lines at the beginning of every SCSS block
+          additionalData: '@use "@/assets/scss/utilities/_mixins.scss" as *;',
+        },
+      },
+    },
   },
 
   modules: ["@nuxt/fonts", "@nuxt/image"],

@@ -1,0 +1,608 @@
+// import
+// import ./utilities/mixins.scss
+@use "./utilities/mixins.scss";
+/**
+    RESET STYLES
+*/
+/* 1. Use a more-intuitive box-sizing model */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+/* 2. Remove default margin */
+* {
+  padding: 0;
+  margin: 0;
+}
+
+/* 3. Enable keyword animations */
+@media (prefers-reduced-motion: no-preference) {
+  html {
+    interpolate-size: allow-keywords;
+  }
+}
+
+body {
+  /* 4. Add accessible line-height */
+  line-height: 1.2;
+
+  /* 5. Improve text rendering */
+  font-family: "Acumin Pro", sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+  overflow-x: hidden;
+  /* overflow-y: hidden; */
+  transition: background-color 0.3s ease;
+}
+
+/* 6. Improve media defaults */
+img,
+picture,
+video,
+canvas,
+svg {
+  display: block;
+  max-width: 100%;
+}
+
+/* 7. Inherit fonts for form controls */
+input,
+button,
+textarea,
+select {
+  font: inherit;
+}
+
+/* 8. Avoid text overflows */
+p,
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  overflow-wrap: break-word;
+}
+
+/* 9. Improve line wrapping */
+p {
+  text-wrap: pretty;
+}
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  text-wrap: balance;
+}
+
+/*
+  10. Create a root stacking context
+*/
+#root,
+#__next {
+  isolation: isolate;
+}
+
+/* 
+  Variables
+*/
+:root {
+  --color-white: #f9f9f9;
+  --color-black: #221e1f;
+  --color-blue: #71bff6;
+  --color-pink: #ffa9c9;
+  --color-grey: #c5cdcf;
+
+  /* Desktop Grid */
+  --grid-col-1: 16.7%;
+  --grid-col-2: 9.73%;
+  --grid-col-3: 38.85%;
+  --grid-col-4: 34.73%;
+  --grid-margin: 50px;
+  --grid-gap: 0px; /* Ajustez si nécessaire */
+
+  /* Mobile Grid */
+  --grid-col-mobile-1: 20%;
+  --grid-col-mobile-2: 40%;
+  --grid-col-mobile-3: 40%;
+
+  --font-inter: "Inter Tight", sans-serif;
+  --font-cormorant: "Cormorant Garamond", serif;
+}
+
+/**
+  Containers
+*/
+.container,
+.container-grid {
+  margin-inline: var(--gutter-x);
+}
+
+.grid,
+.container-grid {
+  display: grid;
+  grid-template-columns: repeat(var(--columns), 1fr);
+  grid-template-rows: repeat(var(--rows), 1fr);
+  gap: var(--grid-gap);
+}
+
+/* 
+  Utils
+*/
+
+.blend-mode {
+  mix-blend-mode: difference;
+}
+
+.overflow-x-hidden {
+  overflow-x: hidden;
+}
+
+.js-char {
+  display: inline-block;
+}
+
+.gs-dev-tools {
+  z-index: 9999;
+}
+
+/* 
+  Grid System
+*/
+
+/* Container principal */
+.grid-container {
+  width: 100%;
+  padding: 0 var(--grid-margin);
+  box-sizing: border-box;
+}
+
+/* Grid Desktop */
+.grid {
+  display: grid;
+  grid-template-columns:
+    var(--grid-col-1)
+    var(--grid-col-2)
+    var(--grid-col-3)
+    var(--grid-col-4);
+  gap: var(--grid-gap);
+  width: 100%;
+}
+
+/* Classes utilitaires pour spans de colonnes - Desktop */
+.col-span-1 {
+  grid-column: span 1;
+}
+.col-span-2 {
+  grid-column: span 2;
+}
+.col-span-3 {
+  grid-column: span 3;
+}
+.col-span-4 {
+  grid-column: span 4;
+}
+
+/* Classes pour démarrer à une colonne spécifique - Desktop */
+.col-start-1 {
+  grid-column-start: 1;
+}
+.col-start-2 {
+  grid-column-start: 2;
+}
+.col-start-3 {
+  grid-column-start: 3;
+}
+.col-start-4 {
+  grid-column-start: 4;
+}
+
+/* Classes pour finir à une colonne spécifique - Desktop */
+.col-end-2 {
+  grid-column-end: 2;
+}
+.col-end-3 {
+  grid-column-end: 3;
+}
+.col-end-4 {
+  grid-column-end: 4;
+}
+.col-end-5 {
+  grid-column-end: 5;
+}
+
+/* Grid Mobile */
+@media (max-width: 768px) {
+  :root {
+    --grid-margin: 20px; /* Marges réduites sur mobile */
+  }
+
+  .grid {
+    grid-template-columns:
+      var(--grid-col-mobile-1)
+      var(--grid-col-mobile-2)
+      var(--grid-col-mobile-3);
+  }
+
+  /* Classes utilitaires pour spans de colonnes - Mobile */
+  .col-span-1,
+  .col-span-2,
+  .col-span-3,
+  .col-span-4 {
+    grid-column: span 3; /* Par défaut pleine largeur sur mobile */
+  }
+
+  .mobile\:col-span-1 {
+    grid-column: span 1;
+  }
+  .mobile\:col-span-2 {
+    grid-column: span 2;
+  }
+  .mobile\:col-span-3 {
+    grid-column: span 3;
+  }
+
+  /* Classes pour démarrer à une colonne spécifique - Mobile */
+  .mobile\:col-start-1 {
+    grid-column-start: 1;
+  }
+  .mobile\:col-start-2 {
+    grid-column-start: 2;
+  }
+  .mobile\:col-start-3 {
+    grid-column-start: 3;
+  }
+
+  /* Classes pour finir à une colonne spécifique - Mobile */
+  .mobile\:col-end-2 {
+    grid-column-end: 2;
+  }
+  .mobile\:col-end-3 {
+    grid-column-end: 3;
+  }
+  .mobile\:col-end-4 {
+    grid-column-end: 4;
+  }
+}
+
+/* Grille de visualisation pour le développement (à retirer en production) */
+.grid-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  pointer-events: none;
+  z-index: 9999;
+  padding: 0 var(--grid-margin);
+}
+
+.grid-overlay-inner {
+  height: 100%;
+  display: grid;
+  grid-template-columns:
+    var(--grid-col-1)
+    var(--grid-col-2)
+    var(--grid-col-3)
+    var(--grid-col-4);
+  gap: var(--grid-gap);
+}
+
+.grid-overlay-col {
+  background: rgba(255, 0, 0, 0.1);
+  border-left: 1px solid rgba(255, 0, 0, 0.3);
+  border-right: 1px solid rgba(255, 0, 0, 0.3);
+}
+
+@media (max-width: 768px) {
+  .grid-overlay-inner {
+    grid-template-columns:
+      var(--grid-col-mobile-1)
+      var(--grid-col-mobile-2)
+      var(--grid-col-mobile-3);
+  }
+}
+
+/* assets/css/typography.css */
+
+/* ============================================
+   SYSTÈME DE BASE FLUIDE REM
+   ============================================ */
+
+html {
+  font-size: 2.6666666667vw; /* Base fluide pour très petits écrans */
+  font-synthesis: none;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+/* Mobile (375px+) : 1rem = 10px */
+@media only screen and (min-width: 375px) {
+  html {
+    font-size: 10px;
+  }
+}
+
+/* Tablet (768px+) : 1rem = 12px */
+@media only screen and (min-width: 768px) {
+  html {
+    font-size: 12px;
+  }
+}
+
+/* Desktop (1024px+) : 1rem = 0.625vw (fluide) */
+/* À 1920px : 1rem = 12px */
+@media only screen and (min-width: 1024px) {
+  html {
+    font-size: 0.625vw;
+  }
+}
+
+/* 4K et plus (2560px+) : Cap à 16px pour éviter trop gros */
+@media only screen and (min-width: 2560px) {
+  html {
+    font-size: 16px;
+  }
+}
+
+/* ============================================
+   TYPE 1 - MOBILE
+   ============================================ */
+
+.t1-h1,
+.type-1 h1 {
+  font-size: 13.5rem; /* 135px mobile */
+  line-height: 1.21; /* 163/135 */
+  letter-spacing: -0.05em;
+  font-weight: 700;
+  margin: 0;
+}
+
+.t1-h2,
+.type-1 h2 {
+  font-size: 4rem; /* 40px mobile */
+  line-height: 1.2; /* 48/40 */
+  letter-spacing: -0.05em;
+  font-weight: 700;
+  margin: 0;
+}
+
+.t1-h3,
+.type-1 h3 {
+  font-size: 3.3rem; /* 33px mobile */
+  line-height: 1.21; /* 40/33 */
+  letter-spacing: -0.08em; /* Design spec mobile */
+  font-weight: 700;
+  margin: 0;
+}
+
+.t1-h4,
+.type-1 h4 {
+  font-size: 2.5rem; /* 25px mobile */
+  line-height: 1.2; /* 30/25 */
+  letter-spacing: -0.05em;
+  font-weight: 700;
+  margin: 0;
+}
+
+.t1-body-accent,
+.type-1 .body-accent {
+  font-size: 2.4rem; /* 24px mobile */
+  line-height: 1.21; /* 29/24 */
+  letter-spacing: -0.03em;
+  font-weight: 500;
+  margin: 0;
+}
+
+.t1-body,
+.type-1 p,
+.type-1 .body {
+  font-size: 1.15rem; /* 11px mobile */
+  line-height: 1.18; /* 13/11 */
+  letter-spacing: -0.03em;
+  font-weight: 400;
+  margin: 0;
+}
+
+/* ============================================
+   TYPE 1 - DESKTOP (1024px+)
+   ============================================ */
+
+@media only screen and (min-width: 1024px) {
+  .t1-h1,
+  .type-1 h1 {
+    font-size: 34.5rem; /* 345px desktop */
+    line-height: 1.21; /* 417/345 */
+    letter-spacing: -0.05em;
+  }
+
+  .t1-h2,
+  .type-1 h2 {
+    font-size: 15.5rem; /* 155px desktop */
+    line-height: 1.21; /* 187/155 */
+  }
+
+  .t1-h3,
+  .type-1 h3 {
+    font-size: 11rem; /* 110px desktop */
+    line-height: 0.91; /* 100/110 */
+    letter-spacing: -0.05em; /* Retour à -5% sur desktop */
+  }
+
+  .t1-h4,
+  .type-1 h4 {
+    font-size: 6.6rem; /* 66px desktop */
+    line-height: 1.21; /* 80/66 */
+  }
+
+  .t1-body-accent,
+  .type-1 .body-accent {
+    font-size: 2.4rem; /* Reste 24px */
+    line-height: 1.21; /* 29/24 */
+  }
+
+  .t1-body,
+  .type-1 p,
+  .type-1 .body {
+    font-size: 1.8rem; /* 18px desktop */
+    line-height: 1.21; /* 21.8/18 */
+  }
+}
+
+/* ============================================
+   TYPE 2 - MOBILE
+   ============================================ */
+
+.t2-h1,
+.type-2 h1 {
+  font-size: 18.7rem; /* 187px mobile */
+  line-height: 1.21; /* 226/187 */
+  letter-spacing: -0.05em;
+  font-weight: 700;
+  margin: 0;
+}
+
+.t2-h2,
+.type-2 h2 {
+  font-size: 5.2rem; /* 52px mobile */
+  line-height: 1.21; /* 63/52 */
+  letter-spacing: -0.05em;
+  font-weight: 700;
+  margin: 0;
+}
+
+.t2-h3,
+.type-2 h3 {
+  font-size: 4.5rem; /* 45px mobile */
+  line-height: 2.22; /* 100/45 */
+  letter-spacing: -0.05em;
+  font-weight: 700;
+  margin: 0;
+}
+
+.t2-h4,
+.type-2 h4 {
+  font-size: 3.5rem; /* 35px mobile */
+  line-height: 1.2; /* 42/35 */
+  letter-spacing: -0.05em;
+  font-weight: 700;
+  margin: 0;
+}
+
+.t2-body-accent,
+.type-2 .body-accent {
+  font-size: 1rem; /* 10px mobile */
+  line-height: 1.9; /* 19/10 */
+  letter-spacing: -0.08em;
+  font-weight: 500;
+  margin: 0;
+}
+
+/* ============================================
+   TYPE 2 - DESKTOP (1024px+)
+   ============================================ */
+
+@media only screen and (min-width: 1024px) {
+  .t2-h1,
+  .type-2 h1 {
+    font-size: 43.5rem; /* 435px desktop */
+    line-height: 1.21; /* 526.8/435 */
+  }
+
+  .t2-h2,
+  .type-2 h2 {
+    font-size: 21rem; /* 210px desktop */
+    line-height: 1.21; /* 254.3/210 */
+  }
+
+  .t2-h3,
+  .type-2 h3 {
+    font-size: 15.2rem; /* 152px desktop */
+    line-height: 0.66; /* 100/152 */
+  }
+
+  .t2-h4,
+  .type-2 h4 {
+    font-size: 8.3rem; /* 83px desktop */
+    line-height: 1.21; /* 100.5/83 */
+  }
+
+  .t2-body-accent,
+  .type-2 .body-accent {
+    font-size: 2.1rem; /* 21px desktop */
+    line-height: 0.9; /* 19/21 */
+  }
+}
+
+/* ============================================
+   CLASSES UTILITAIRES
+   ============================================ */
+
+/* Tracking */
+.tracking-tight {
+  letter-spacing: -0.05em;
+}
+
+.tracking-normal {
+  letter-spacing: -0.03em;
+}
+
+.tracking-wide {
+  letter-spacing: -0.08em;
+}
+
+/* Font weights */
+.font-light {
+  font-weight: 300;
+}
+
+.font-normal {
+  font-weight: 400;
+}
+
+.font-medium {
+  font-weight: 500;
+}
+
+.font-semibold {
+  font-weight: 600;
+}
+
+.font-bold {
+  font-weight: 700;
+}
+
+/* Reset marges pour éviter conflits */
+.type-1 *,
+.type-2 * {
+  margin: 0;
+}
+
+/* ============================================
+   OPTIMISATIONS GLOBALES
+   ============================================ */
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6,
+p {
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+svg,
+img {
+  display: block;
+  width: 100%;
+  height: auto;
+}

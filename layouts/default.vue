@@ -7,9 +7,9 @@
       <main>
         <slot />
 
-        <Typography />
+        <!--  <Typography /> -->
 
-        <section data-theme="dark" style="background: black">
+        <section class="about" data-theme="dark" style="background: black">
           <!-- Le header devient blanc automatiquement -->
         </section>
 

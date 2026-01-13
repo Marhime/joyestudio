@@ -1,5 +1,4 @@
 import gsap from "gsap";
-import { ScrollTrigger } from "gsap/ScrollTrigger";
 import type { WatchSource } from "vue";
 
 export function useGSAP(
@@ -7,8 +6,6 @@ export function useGSAP(
   watchSource?: WatchSource
 ): void {
   let ctx: gsap.Context | undefined;
-
-  gsap.registerPlugin(ScrollTrigger);
 
   function _callback() {
     ctx?.revert();
