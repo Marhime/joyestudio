@@ -146,6 +146,7 @@
 </template>
 
 <script lang="ts" setup>
+import { useGSAP } from "~/composables/useGSAP";
 const { $gsap, $Flip } = useNuxtApp();
 
 const sectionRef = ref<HTMLElement | null>(null);
@@ -154,62 +155,43 @@ const logoRightRef = ref<HTMLElement | null>(null);
 const logoLeftPlaceholderRef = ref<HTMLElement | null>(null);
 const logoRightPlaceholderRef = ref<HTMLElement | null>(null);
 
-onMounted(() => {
+useGSAP(() => {
   nextTick(() => {
-    setupFlipAnimation();
-  });
-});
+    const finalLeftContainer = document.querySelector(
+      "[header-logo-left]"
+    ) as HTMLElement | null;
+    const finalRightContainer = document.querySelector(
+      "[header-logo-right]"
+    ) as HTMLElement | null;
 
-function setupFlipAnimation() {
-  const finalLeftContainer = document.querySelector(
-    "[header-logo-left]"
-  ) as HTMLElement | null;
-  const finalRightContainer = document.querySelector(
-    "[header-logo-right]"
-  ) as HTMLElement | null;
-  const initialLeftRect = logoLeftPlaceholderRef.value?.getBoundingClientRect();
-  const initialRightRect =
-    logoRightPlaceholderRef.value?.getBoundingClientRect();
-
-  if (!logoLeftRef.value || !logoRightRef.value) return;
-
-  if (!finalLeftContainer || !finalRightContainer) {
-    console.warn("Header logo targets not found");
-    return;
-  }
-
-  // make the element fixed position to prepare for FLIP animation
-  $gsap.set(logoLeftRef.value, {
-    position: "fixed",
-    top: initialLeftRect?.top,
-    left: initialLeftRect?.left,
-    width: initialLeftRect?.width,
-    height: initialLeftRect?.height,
-    zIndex: 1000,
-  });
-
-  $gsap.set(logoRightRef.value, {
-    position: "fixed",
-    top: initialRightRect?.top,
-    left: initialRightRect?.left,
-    width: initialRightRect?.width,
-    height: initialRightRect?.height,
-    zIndex: 1000,
-  });
-
-  // Create a scrubbed timeline on first scroll enter so the FLIP.fit
-  // animations are driven by the section's scroll without affecting
-  // layout at load.
-  let st: any = null;
-  let tl: any = null;
-  const createScrubTimeline = () => {
-    if (tl) return;
     if (!logoLeftRef.value || !logoRightRef.value) return;
+    if (!finalLeftContainer || !finalRightContainer) return;
 
-    const finalStateLeft = $Flip.getState(finalLeftContainer);
-    const finalStateRight = $Flip.getState(finalRightContainer);
+    const initialLeftRect =
+      logoLeftPlaceholderRef.value?.getBoundingClientRect();
+    const initialRightRect =
+      logoRightPlaceholderRef.value?.getBoundingClientRect();
 
-    tl = $gsap.timeline({
+    // set fixed when the context is active (avoids layout shifts before context)
+    $gsap.set(logoLeftRef.value, {
+      position: "fixed",
+      top: initialLeftRect?.top,
+      left: initialLeftRect?.left,
+      width: initialLeftRect?.width,
+      height: initialLeftRect?.height,
+      zIndex: 1000,
+    });
+
+    $gsap.set(logoRightRef.value, {
+      position: "fixed",
+      top: initialRightRect?.top,
+      left: initialRightRect?.left,
+      width: initialRightRect?.width,
+      height: initialRightRect?.height,
+      zIndex: 1000,
+    });
+
+    const tl = $gsap.timeline({
       scrollTrigger: {
         trigger: sectionRef.value,
         start: "top top",
@@ -219,29 +201,20 @@ function setupFlipAnimation() {
       },
     });
 
+    const finalStateLeft = $Flip.getState(finalLeftContainer);
+    const finalStateRight = $Flip.getState(finalRightContainer);
+
     const flipConfig = {
       ease: "none",
       duration: 1,
     };
 
-    tl.add($Flip.fit(logoLeftRef.value, finalStateLeft, flipConfig)).add(
-      $Flip.fit(logoRightRef.value, finalStateRight, flipConfig),
+    tl.add(
+      $Flip.fit(logoLeftRef.value, finalStateLeft, flipConfig) as any,
       0
-    );
-  };
-
-  createScrubTimeline();
-
-  // Cleanup on unmount
-  onUnmounted(() => {
-    try {
-      if (tl && typeof tl.kill === "function") tl.kill();
-      if (st && typeof st.kill === "function") st.kill();
-    } catch (e) {
-      /* ignore */
-    }
+    ).add($Flip.fit(logoRightRef.value, finalStateRight, flipConfig) as any, 0);
   });
-}
+});
 </script>
 <style lang="scss" scoped>
 .hero-section {
