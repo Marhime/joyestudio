@@ -94,7 +94,7 @@
 
         <!-- Contact button -->
         <div class="header-contact">
-          <NuxtLink class="t1-body" to="#contact">Get in touch</NuxtLink>
+          <ButtonComponent color="light" label="Start Your Project" />
         </div>
       </nav>
     </div>
@@ -103,22 +103,14 @@
 
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted } from "vue";
-
-interface Theme {
-  text: string;
-  bg: string;
-}
-
-const themes = {
-  light: { text: "#000000", bg: "#ffffff" },
-  dark: { text: "#ffffff", bg: "#000000" },
-};
+import { useTheme } from "~/composables/useTheme";
+import ButtonComponent from "./ButtonComponent.vue";
 
 const props = defineProps<{
   theme?: "light" | "dark";
 }>();
 
-const currentTheme = ref<Theme>(themes[props.theme || "light"]);
+const { currentTheme, setTheme } = useTheme();
 const isScrolled = ref(false);
 
 // Fonction pour détecter le scroll
@@ -141,14 +133,15 @@ const detectSection = () => {
       const sectionTheme = section.getAttribute("data-theme") as
         | "light"
         | "dark";
-      if (sectionTheme && themes[sectionTheme]) {
-        currentTheme.value = themes[sectionTheme];
+      if (sectionTheme === "light" || sectionTheme === "dark") {
+        setTheme(sectionTheme);
       }
     }
   });
 };
 
 onMounted(() => {
+  if (props.theme) setTheme(props.theme);
   window.addEventListener("scroll", handleScroll);
   window.addEventListener("scroll", detectSection);
   detectSection(); // Initial check
@@ -162,7 +155,7 @@ onUnmounted(() => {
 // Méthode exposée pour changer le thème manuellement
 defineExpose({
   setTheme: (theme: "light" | "dark") => {
-    currentTheme.value = themes[theme];
+    setTheme(theme);
   },
 });
 </script>
@@ -207,7 +200,6 @@ defineExpose({
 .menu-list a {
   color: var(--theme-text);
   text-decoration: none;
-  transition: color 0.3s ease;
   position: relative;
 }
 

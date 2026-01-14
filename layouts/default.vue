@@ -36,6 +36,7 @@
 
 <script lang="ts" setup>
 import { ref, onMounted, onUnmounted } from "vue";
+import Header from "~/components/layout/Header.vue";
 
 const showGrid = ref(false);
 
