@@ -46,6 +46,7 @@
           <svg
             class="logo-svg"
             ref="logoLeftRef"
+            hero-logo-left
             width="573"
             height="395"
             viewBox="0 0 573 395"
@@ -107,6 +108,7 @@
           </svg>
           <svg
             ref="logoRightRef"
+            hero-logo-right
             class="logo-svg"
             width="840"
             height="264"
@@ -145,36 +147,33 @@
   </section>
 </template>
 
-<script lang="ts" setup>
-import { useGSAP } from "~/composables/useGSAP";
-const { $gsap, $Flip } = useNuxtApp();
+<script setup>
+const { $gsap, $Flip, $lenis } = useNuxtApp();
 const { currentTheme } = useTheme();
 
-const sectionRef = ref<HTMLElement | null>(null);
-const logoLeftRef = ref<HTMLElement | null>(null);
-const logoRightRef = ref<HTMLElement | null>(null);
-const logoLeftPlaceholderRef = ref<HTMLElement | null>(null);
-const logoRightPlaceholderRef = ref<HTMLElement | null>(null);
+const sectionRef = ref(null);
+const logoLeftPlaceholderRef = ref(null);
+const logoRightPlaceholderRef = ref(null);
 
-useGSAP(() => {
-  nextTick(() => {
-    const finalLeftContainer = document.querySelector(
-      "[header-logo-left]"
-    ) as HTMLElement | null;
-    const finalRightContainer = document.querySelector(
-      "[header-logo-right]"
-    ) as HTMLElement | null;
+onMounted(() => {
+  const logoLeftRef = document.querySelector("[hero-logo-left]");
+  const logoRightRef = document.querySelector("[hero-logo-right]");
+  // Set initial colors based on theme
+  const finalLeftContainer = document.querySelector("[header-logo-left]");
+  const finalRightContainer = document.querySelector("[header-logo-right]");
 
-    if (!logoLeftRef.value || !logoRightRef.value) return;
-    if (!finalLeftContainer || !finalRightContainer) return;
+  let initialLeftRect;
+  let initialRightRect;
+  let finalStateLeft;
+  let finalStateRight;
 
-    const initialLeftRect =
-      logoLeftPlaceholderRef.value?.getBoundingClientRect();
-    const initialRightRect =
-      logoRightPlaceholderRef.value?.getBoundingClientRect();
+  let ctx;
 
-    // set fixed when the context is active (avoids layout shifts before context)
-    $gsap.set(logoLeftRef.value, {
+  const updatePositions = () => {
+    initialLeftRect = logoLeftPlaceholderRef.value?.getBoundingClientRect();
+    initialRightRect = logoRightPlaceholderRef.value?.getBoundingClientRect();
+
+    $gsap.set(logoLeftRef, {
       position: "fixed",
       top: initialLeftRect?.top,
       left: initialLeftRect?.left,
@@ -183,7 +182,7 @@ useGSAP(() => {
       zIndex: 1000,
     });
 
-    $gsap.set(logoRightRef.value, {
+    $gsap.set(logoRightRef, {
       position: "fixed",
       top: initialRightRect?.top,
       left: initialRightRect?.left,
@@ -191,28 +190,54 @@ useGSAP(() => {
       height: initialRightRect?.height,
       zIndex: 1000,
     });
+  };
 
-    const tl = $gsap.timeline({
-      scrollTrigger: {
-        trigger: sectionRef.value,
-        start: "top top",
-        end: "bottom 66.66667%",
-        scrub: 1,
-      },
+  const createFlipAnimation = () => {
+    // revalidate positions
+    ctx?.revert();
+
+    // set fixed when the context is active (avoids layout shifts before context)
+    ctx = $gsap.context(() => {
+      updatePositions();
+      finalStateLeft = $Flip.getState(finalLeftContainer);
+      finalStateRight = $Flip.getState(finalRightContainer);
+      const tl = $gsap.timeline({
+        scrollTrigger: {
+          trigger: sectionRef.value,
+          start: "top top",
+          end: "bottom 66.66667%",
+          scrub: 1,
+        },
+      });
+
+      const flipConfig = {
+        ease: "none",
+        duration: 1,
+      };
+
+      tl.add($Flip.fit(logoLeftRef, finalStateLeft, flipConfig), 0).add(
+        $Flip.fit(logoRightRef, finalStateRight, flipConfig),
+        0
+      );
     });
+  };
 
-    const finalStateLeft = $Flip.getState(finalLeftContainer);
-    const finalStateRight = $Flip.getState(finalRightContainer);
-
-    const flipConfig = {
-      ease: "none",
-      duration: 1,
+  const debounce = (func, wait) => {
+    let timeout;
+    return () => {
+      clearTimeout(timeout);
+      timeout = setTimeout(() => {
+        func();
+      }, wait);
     };
+  };
 
-    tl.add(
-      $Flip.fit(logoLeftRef.value, finalStateLeft, flipConfig) as any,
-      0
-    ).add($Flip.fit(logoRightRef.value, finalStateRight, flipConfig) as any, 0);
+  createFlipAnimation();
+
+  window.addEventListener("resize", () => {
+    debounce(() => {
+      createFlipAnimation();
+    }, 200)();
   });
 });
 </script>
@@ -245,7 +270,7 @@ useGSAP(() => {
   gap: 6rem;
 
   .svg-placeholder {
-    visibility: hidden;
+    // visibility: hidden;
   }
 
   .logo-left {

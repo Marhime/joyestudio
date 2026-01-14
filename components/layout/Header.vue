@@ -178,9 +178,9 @@ defineExpose({
 }
 
 .header-nav {
-  display: grid;
+  display: flex;
+  justify-content: space-between;
   align-items: center;
-  grid-template-columns: repeat(3, 1fr);
 }
 
 .header-menu {
@@ -224,9 +224,12 @@ defineExpose({
 
 .header-logo {
   margin: auto;
-  position: relative;
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%);
   width: 13.1rem;
-  visibility: hidden;
+  // visibility: hidden;
   .logo-left {
     position: absolute;
     width: 6.9rem;
@@ -268,17 +271,14 @@ defineExpose({
   }
 
   .header-nav {
-    grid-template-columns: 1fr;
   }
 
   .header-logo {
-    grid-column: span 3;
     text-align: center;
     margin-bottom: 20px;
   }
 
   .header-menu {
-    grid-column: span 3;
     justify-content: center;
   }
 
