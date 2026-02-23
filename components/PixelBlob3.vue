@@ -25,10 +25,10 @@ let moveSpeed = 0,
   tickCounter = 0;
 
 const guiParams = {
-  pixelSize:  0.005,
-  edgeWidth:  0.45,
+  pixelSize: 0.005,
+  edgeWidth: 0.45,
   flickerSpeed: 6,
-  color: '#ffe15a',
+  color: "#ffe15a",
 };
 
 // ─── Shaders ───────────────────────────────────────────────────────────────
@@ -148,8 +148,8 @@ const animate = () => {
 
   // Update shader uniforms
   const u = mesh.material.uniforms;
-  u.time.value      = time;
-  u.uVelo.value     = smoothVelo;
+  u.time.value = time;
+  u.uVelo.value = smoothVelo;
   u.uPixelSize.value = guiParams.pixelSize;
   u.uEdgeWidth.value = guiParams.edgeWidth;
 
@@ -203,12 +203,12 @@ const init = () => {
     vertexShader,
     fragmentShader,
     uniforms: {
-      time:        { value: 0 },
-      uVelo:       { value: 0 },
-      uTick:       { value: 0 },
-      uPixelSize:  { value: guiParams.pixelSize },
-      uEdgeWidth:  { value: guiParams.edgeWidth },
-      uColor:      { value: new THREE.Color(props.color) },
+      time: { value: 0 },
+      uVelo: { value: 0 },
+      uTick: { value: 0 },
+      uPixelSize: { value: guiParams.pixelSize },
+      uEdgeWidth: { value: guiParams.edgeWidth },
+      uColor: { value: new THREE.Color(props.color) },
     },
     transparent: true,
     depthWrite: false,
@@ -222,16 +222,19 @@ const init = () => {
   window.addEventListener("pointermove", onPointerMove);
 
   // ─── lil-gui ─────────────────────────────────────────────────────────
-  import('lil-gui').then(({ default: GUI }) => {
-    gui = new GUI({ title: 'Pixel Blob' });
+  import("lil-gui").then(({ default: GUI }) => {
+    gui = new GUI({ title: "Pixel Blob" });
     const u = mesh.material.uniforms;
 
-    gui.add(guiParams, 'pixelSize', 0.002, 0.03, 0.001).name('Pixel size');
-    gui.add(guiParams, 'edgeWidth', 0.2, 1.0, 0.01).name('Edge width');
-    gui.add(guiParams, 'flickerSpeed', 1, 20, 0.5).name('Flicker speed');
-    gui.addColor(guiParams, 'color').name('Color').onChange((v) => {
-      u.uColor.value.set(v);
-    });
+    gui.add(guiParams, "pixelSize", 0.002, 0.03, 0.001).name("Pixel size");
+    gui.add(guiParams, "edgeWidth", 0.2, 1.0, 0.01).name("Edge width");
+    gui.add(guiParams, "flickerSpeed", 1, 20, 0.5).name("Flicker speed");
+    gui
+      .addColor(guiParams, "color")
+      .name("Color")
+      .onChange((v) => {
+        u.uColor.value.set(v);
+      });
   });
 
   animate();
