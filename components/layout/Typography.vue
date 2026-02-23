@@ -2,7 +2,7 @@
 <template>
   <div>
     <!-- Section avec Type 1 -->
-    <section data-theme="light" class="section type-1">
+    <section data-theme="white" class="section type-1">
       <div class="grid-container">
         <div class="grid">
           <div class="col-span-4">
@@ -55,7 +55,7 @@
     </section>
 
     <!-- Section de contrôle (dev only) -->
-    <section data-theme="light" class="section controls">
+    <section data-theme="white" class="section controls">
       <div class="grid-container">
         <div class="grid">
           <div class="col-span-4">

@@ -6,31 +6,8 @@
     <div class="main-content">
       <main>
         <slot />
-
-        <!--  <Typography /> -->
-
-        <section class="about" data-theme="dark" style="background: black">
-          <!-- Le header devient blanc automatiquement -->
-        </section>
-
-        <section data-theme="light" style="background: white">
-          <!-- Le header devient noir automatiquement -->
-        </section>
       </main>
-      <!-- <footer class="footer"></footer> -->
     </div>
-    <!-- <Cursor /> -->
-    <div v-if="showGrid" class="grid-overlay">
-      <div class="grid-overlay-inner">
-        <div class="grid-overlay-col"></div>
-        <div class="grid-overlay-col"></div>
-        <div class="grid-overlay-col"></div>
-        <div class="grid-overlay-col"></div>
-      </div>
-    </div>
-
-    <!-- vertical bar center -->
-    <div v-if="showGrid" class="vertical-bar-center"></div>
   </div>
 </template>
 

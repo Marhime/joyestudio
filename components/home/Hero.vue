@@ -1,15 +1,14 @@
 <template>
   <section data-theme="dark" ref="sectionRef" class="hero-section">
     <div class="grid-container">
-      <div class="hero-content col-start-4">
-        <h1 class="t1-body">
-          <span>We create things people love to use</span> - and businesses love
-          to own
-        </h1>
-      </div>
-
-      <div class="home-logo" :style="{ color: currentTheme.text }">
-        <div class="hiye">
+      <div class="home-logo">
+        <div class="hero-content">
+          <h1 class="t1-body">
+            <span>We create things people love to use</span> - and businesses
+            love to own
+          </h1>
+        </div>
+        <div hiye-face class="hiye">
           <img
             class="hife--face"
             src="~/assets/images/HiYe2.png"
@@ -25,6 +24,7 @@
             viewBox="0 0 573 395"
             fill="none"
             xmlns="http://www.w3.org/2000/svg"
+            hero-placeholder-left
           >
             <path
               d="M2.958 355.83C2.378 356.12 1.653 355.54 0.783 354.09C-0.087 352.64 -0.232 351.625 0.348 351.045C13.978 342.925 24.563 330.745 32.103 314.505C39.643 298.265 45.588 278.255 49.938 254.475L88.653 35.235C90.973 22.765 90.393 14.645 86.913 10.875C83.723 7.10499 75.313 5.21998 61.683 5.21998C61.103 5.21998 60.813 4.34999 60.813 2.60999C60.813 0.869997 61.103 0 61.683 0C67.483 0 74.153 0.289996 81.693 0.869989C89.233 1.15999 97.208 1.30498 105.618 1.30498C115.188 1.30498 123.598 1.15999 130.848 0.869989C138.388 0.289996 144.913 0 150.423 0C151.293 0 151.728 0.869997 151.728 2.60999C151.728 4.34999 151.293 5.21998 150.423 5.21998C141.433 5.21998 134.618 6.08998 129.978 7.82998C125.338 9.56999 121.858 12.615 119.538 16.965C117.218 21.315 115.333 27.695 113.883 36.105L77.343 242.73C73.283 265.35 68.208 283.62 62.118 297.54C56.318 311.75 48.633 323.205 39.063 331.905C29.783 340.895 17.748 348.87 2.958 355.83Z"
@@ -80,6 +80,7 @@
             viewBox="0 0 840 264"
             fill="none"
             xmlns="http://www.w3.org/2000/svg"
+            hero-placeholder-right
           >
             <path
               d="M90.293 263.13C72.3242 263.13 56.77 260.266 43.6304 254.539C30.4907 248.699 20.1587 240.613 12.6343 230.281C5.22217 219.836 1.01074 207.764 0 194.062H31.333C32.2314 203.496 35.4321 211.301 40.9351 217.478C46.5503 223.655 53.6816 228.259 62.3291 231.292C70.9766 234.324 80.2979 235.84 90.293 235.84C101.86 235.84 112.249 233.931 121.458 230.112C130.779 226.294 138.135 220.959 143.525 214.109C148.916 207.258 151.611 199.229 151.611 190.02C151.611 181.709 149.253 174.971 144.536 169.805C139.819 164.639 133.643 160.427 126.006 157.17C118.481 153.914 110.283 151.05 101.411 148.579L70.752 139.819C51.0986 134.204 35.5444 126.174 24.0894 115.73C12.7466 105.173 7.0752 91.416 7.0752 74.458C7.0752 60.4199 10.8374 48.1787 18.3618 37.7344C25.9985 27.1777 36.2744 18.9795 49.1895 13.1396C62.2168 7.2998 76.7041 4.37988 92.6514 4.37988C108.823 4.37988 123.198 7.2998 135.776 13.1396C148.354 18.8672 158.35 26.7285 165.762 36.7236C173.174 46.6064 177.104 57.8369 177.554 70.415H147.905C146.445 58.0615 140.493 48.4595 130.049 41.6089C119.717 34.7583 106.914 31.333 91.6406 31.333C80.6348 31.333 70.9766 33.1299 62.666 36.7236C54.3555 40.3174 47.8979 45.2588 43.2935 51.5479C38.689 57.8369 36.3867 65.0244 36.3867 73.1104C36.3867 81.9824 39.1382 89.1699 44.6411 94.6729C50.144 100.063 56.6577 104.275 64.1821 107.307C71.8188 110.339 78.7256 112.754 84.9023 114.551L110.171 121.626C116.685 123.423 123.928 125.837 131.902 128.87C139.988 131.902 147.737 136.001 155.149 141.167C162.673 146.333 168.85 152.959 173.679 161.045C178.508 169.019 180.923 178.901 180.923 190.693C180.923 204.17 177.385 216.411 170.31 227.417C163.235 238.311 152.959 247.014 139.482 253.528C126.006 259.929 109.609 263.13 90.293 263.13Z"
@@ -142,40 +143,60 @@
             />
           </svg>
         </div>
+        <div ref="buttonWrapperRef" class="button-wrapper">
+          <ButtonComponent
+            href="/process"
+            label="View projects"
+            labelSecondary="Take a look  👀"
+          />
+        </div>
       </div>
     </div>
   </section>
 </template>
 
 <script setup>
+import ButtonComponent from "../layout/ButtonComponent.vue";
+
 const { $gsap, $Flip, $lenis } = useNuxtApp();
-const { currentTheme } = useTheme();
+const { currentTheme, changeThemeTo, setShowLogo } = useThemeStore();
 
 const sectionRef = ref(null);
-const logoLeftPlaceholderRef = ref(null);
-const logoRightPlaceholderRef = ref(null);
+const buttonWrapperRef = ref(null);
+
+let ctx;
 
 onMounted(() => {
+  changeThemeTo("color");
+  setShowLogo(false);
+
   const logoLeftRef = document.querySelector("[hero-logo-left]");
   const logoRightRef = document.querySelector("[hero-logo-right]");
-  // Set initial colors based on theme
   const finalLeftContainer = document.querySelector("[header-logo-left]");
   const finalRightContainer = document.querySelector("[header-logo-right]");
+  const logoLeftPlaceholderRef = document.querySelector(
+    "[hero-placeholder-left]",
+  );
+  const logoRightPlaceholderRef = document.querySelector(
+    "[hero-placeholder-right]",
+  );
+  const mainGrid = document.getElementById("main-grid");
+  let blocks;
 
   let initialLeftRect;
   let initialRightRect;
   let finalStateLeft;
   let finalStateRight;
 
-  let ctx;
-
   const updatePositions = () => {
-    initialLeftRect = logoLeftPlaceholderRef.value?.getBoundingClientRect();
-    initialRightRect = logoRightPlaceholderRef.value?.getBoundingClientRect();
+    initialLeftRect = logoLeftPlaceholderRef?.getBoundingClientRect();
+    initialRightRect = logoRightPlaceholderRef?.getBoundingClientRect();
+
+    const scrollY = window.scrollY || window.pageYOffset;
 
     $gsap.set(logoLeftRef, {
       position: "fixed",
-      top: initialLeftRect?.top,
+      top: initialLeftRect?.top + scrollY,
       left: initialLeftRect?.left,
       width: initialLeftRect?.width,
       height: initialLeftRect?.height,
@@ -184,7 +205,7 @@ onMounted(() => {
 
     $gsap.set(logoRightRef, {
       position: "fixed",
-      top: initialRightRect?.top,
+      top: initialRightRect?.top + scrollY,
       left: initialRightRect?.left,
       width: initialRightRect?.width,
       height: initialRightRect?.height,
@@ -196,17 +217,31 @@ onMounted(() => {
     // revalidate positions
     ctx?.revert();
 
+    blocks = mainGrid.querySelectorAll(".grid-layout-block");
+
     // set fixed when the context is active (avoids layout shifts before context)
     ctx = $gsap.context(() => {
       updatePositions();
       finalStateLeft = $Flip.getState(finalLeftContainer);
       finalStateRight = $Flip.getState(finalRightContainer);
+
+      console.log(buttonWrapperRef.value);
       const tl = $gsap.timeline({
         scrollTrigger: {
           trigger: sectionRef.value,
           start: "top top",
-          end: "bottom 66.66667%",
+          end: "bottom 20%",
           scrub: 1,
+          // markers: true,
+          id: "logo",
+          onEnterBack: () => {
+            changeThemeTo("color");
+            $gsap.set(buttonWrapperRef.value, { zIndex: 2 });
+          },
+          onLeave: () => {
+            changeThemeTo("white");
+            $gsap.set(buttonWrapperRef.value, { zIndex: 0 });
+          },
         },
       });
 
@@ -215,30 +250,35 @@ onMounted(() => {
         duration: 1,
       };
 
-      tl.add($Flip.fit(logoLeftRef, finalStateLeft, flipConfig), 0).add(
-        $Flip.fit(logoRightRef, finalStateRight, flipConfig),
-        0
-      );
+      tl.add($Flip.fit(logoLeftRef, finalStateLeft, flipConfig), 0)
+        .add($Flip.fit(logoRightRef, finalStateRight, flipConfig), "<")
+        .to(
+          $gsap.utils.shuffle([...blocks]),
+          {
+            stagger: 0.007,
+            backgroundColor: "rgb(255, 255, 255)",
+            ease: "power2.inOut",
+          },
+          0.9,
+        );
     });
   };
 
-  const debounce = (func, wait) => {
-    let timeout;
-    return () => {
-      clearTimeout(timeout);
-      timeout = setTimeout(() => {
-        func();
-      }, wait);
-    };
-  };
+  const debouncedCreateFlipAnimation = debounce(() => {
+    createFlipAnimation();
+  }, 200);
 
-  createFlipAnimation();
+  nextTick(() => {
+    createFlipAnimation();
+  });
 
   window.addEventListener("resize", () => {
-    debounce(() => {
-      createFlipAnimation();
-    }, 200)();
+    debouncedCreateFlipAnimation();
   });
+});
+
+onUnmounted(() => {
+  ctx?.revert();
 });
 </script>
 <style lang="scss" scoped>
@@ -246,21 +286,17 @@ onMounted(() => {
   position: relative;
   width: 100%;
   height: 100vh;
-  background-color: var(--color-blue);
   padding-top: 14.8rem;
+  z-index: 2;
 
   @include respond-to("desktop") {
-    padding-top: 22.6rem;
-  }
-
-  @include respond-to("wide-screen") {
-    padding-top: 17rem;
+    padding-top: 23.1vh;
   }
 }
 
-.grid-container {
+.container {
   position: relative;
-  width: 100%;
+  margin: 0 5vw;
 }
 
 .home-logo {
@@ -268,9 +304,15 @@ onMounted(() => {
   justify-content: space-between;
   flex-direction: column;
   gap: 6rem;
+  position: relative;
+  color: var(--theme-color);
+
+  @include respond-to("desktop") {
+    gap: 0;
+  }
 
   .svg-placeholder {
-    // visibility: hidden;
+    visibility: hidden;
   }
 
   .logo-left {
@@ -279,8 +321,8 @@ onMounted(() => {
     width: 85.76%;
     margin: auto;
     @include respond-to("desktop") {
-      margin: unset;
-      width: 31.43%;
+      margin-left: 0;
+      width: 29.6875vw;
     }
   }
 
@@ -334,7 +376,7 @@ onMounted(() => {
   @include respond-to("desktop") {
     transform: translateX(0);
     left: unset;
-    right: 5rem;
+    right: 0;
     width: 22.13%;
   }
 }
@@ -347,5 +389,16 @@ h1 {
 
 h1 span {
   opacity: 0.55;
+}
+
+.button-wrapper {
+  display: flex;
+  justify-content: center;
+  @include respond-to("desktop") {
+    position: absolute;
+    left: 0;
+    bottom: 0;
+    z-index: 2;
+  }
 }
 </style>

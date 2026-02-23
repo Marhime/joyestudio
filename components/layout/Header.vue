@@ -1,27 +1,22 @@
 <!-- components/Header.vue -->
 <template>
-  <header
-    class="header"
-    :class="{ 'is-scrolled': isScrolled }"
-    :style="{
-      '--theme-text': currentTheme.text,
-      '--theme-bg': currentTheme.bg,
-    }"
-  >
+  <header class="header" :class="{ 'is-scrolled': isScrolled }">
     <div class="grid-container">
       <nav class="header-nav">
         <!-- Menu -->
         <div class="header-menu">
           <ul class="menu-list">
-            <li><NuxtLink class="t1-body" to="#projets">About us</NuxtLink></li>
             <li>
-              <NuxtLink class="t1-body" to="#services">Projects</NuxtLink>
+              <LinkComponent label="About us" href="/" />
             </li>
             <li>
-              <NuxtLink class="t1-body" to="#a-propos">Services</NuxtLink>
+              <LinkComponent label="Projects" href="/typography" />
             </li>
             <li>
-              <NuxtLink class="t1-body" to="#contact">Contact us</NuxtLink>
+              <LinkComponent label="Services" href="/grid-editor" />
+            </li>
+            <li>
+              <LinkComponent label="Contact" href="/contact" />
             </li>
           </ul>
         </div>
@@ -94,7 +89,11 @@
 
         <!-- Contact button -->
         <div class="header-contact">
-          <ButtonComponent color="light" label="Start Your Project" />
+          <ButtonComponent
+            href="/contact"
+            label="Book a call"
+            labelSecondary="Let’s talk  👋"
+          />
         </div>
       </nav>
     </div>
@@ -102,15 +101,15 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted } from "vue";
-import { useTheme } from "~/composables/useTheme";
+import { ref } from "vue";
 import ButtonComponent from "./ButtonComponent.vue";
+import LinkComponent from "./LinkComponent.vue";
 
 const props = defineProps<{
   theme?: "light" | "dark";
 }>();
 
-const { currentTheme, setTheme } = useTheme();
+const { currentTheme, changeThemeTo } = useThemeStore();
 const isScrolled = ref(false);
 
 // Fonction pour détecter le scroll
@@ -131,36 +130,17 @@ const detectSection = () => {
     // Si la section est sous le header
     if (rect.top < headerBottom && rect.bottom > headerBottom) {
       const sectionTheme = section.getAttribute("data-theme") as
-        | "light"
-        | "dark";
-      if (sectionTheme === "light" || sectionTheme === "dark") {
-        setTheme(sectionTheme);
+        | "white"
+        | "color";
+      if (sectionTheme === "white" || sectionTheme === "color") {
+        changeThemeTo(sectionTheme);
       }
     }
   });
 };
-
-onMounted(() => {
-  if (props.theme) setTheme(props.theme);
-  window.addEventListener("scroll", handleScroll);
-  window.addEventListener("scroll", detectSection);
-  detectSection(); // Initial check
-});
-
-onUnmounted(() => {
-  window.removeEventListener("scroll", handleScroll);
-  window.removeEventListener("scroll", detectSection);
-});
-
-// Méthode exposée pour changer le thème manuellement
-defineExpose({
-  setTheme: (theme: "light" | "dark") => {
-    setTheme(theme);
-  },
-});
 </script>
 
-<style lang="scss" scoped>
+<style lang="scss">
 .header {
   position: sticky;
   top: 0;
@@ -173,53 +153,30 @@ defineExpose({
 
   @include respond-to("desktop") {
     position: fixed;
-    padding-top: 50px;
+    padding-top: 5.4vh;
   }
 }
 
 .header-nav {
-  display: flex;
-  justify-content: space-between;
   align-items: center;
+  display: none;
+  @include respond-to("desktop") {
+    @include grid;
+  }
 }
 
 .header-menu {
-  display: flex;
-  justify-content: flex-start;
-  align-items: center;
+  grid-column-start: 1;
+  grid-column-end: 4;
 }
 
 .menu-list {
   display: flex;
-  gap: 40px;
+  align-items: center;
+  gap: 3vw;
   list-style: none;
   margin: 0;
   padding: 0;
-}
-
-.menu-list a {
-  color: var(--theme-text);
-  text-decoration: none;
-  position: relative;
-}
-
-.menu-list a:hover {
-  opacity: 0.7;
-}
-
-.menu-list a::after {
-  content: "";
-  position: absolute;
-  bottom: -5px;
-  left: 0;
-  width: 0;
-  height: 1px;
-  background: var(--theme-text);
-  transition: width 0.3s ease;
-}
-
-.menu-list a:hover::after {
-  width: 100%;
 }
 
 .header-logo {
@@ -229,7 +186,7 @@ defineExpose({
   left: 50%;
   transform: translate(-50%);
   width: 13.1rem;
-  // visibility: hidden;
+  visibility: hidden;
   .logo-left {
     position: absolute;
     width: 6.9rem;
@@ -242,6 +199,10 @@ defineExpose({
     transform: translateY(50%);
     width: 8.69rem;
   }
+}
+
+.show-logo .header-logo {
+  visibility: visible;
 }
 
 .header-logo a {
@@ -263,6 +224,8 @@ defineExpose({
   display: flex;
   justify-content: flex-end;
   align-items: center;
+  grid-column-start: 4;
+  grid-column-end: 5;
 }
 
 @media (max-width: 768px) {
@@ -283,7 +246,7 @@ defineExpose({
   }
 
   .menu-list {
-    gap: 20px;
+    gap: 3.6979166666666665vw;
     flex-wrap: wrap;
     justify-content: center;
   }

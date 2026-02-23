@@ -22,6 +22,28 @@
     }
   }
 }
+
+@mixin grid {
+  display: grid;
+  grid-template-columns:
+    var(--grid-col-mobile-1)
+    var(--grid-col-mobile-2)
+    var(--grid-col-mobile-3);
+  gap: var(--grid-gap);
+  width: 100%;
+
+  @include respond-to("desktop") {
+    grid-template-columns:
+      var(--grid-col-1)
+      var(--grid-col-2)
+      var(--grid-col-3)
+      var(--grid-col-4);
+  }
+}
+
+@mixin font-inter {
+  font-family: var(--font-inter);
+}
 // how to use:
 // @include respond-to("phone") {
 //   // CSS rules for phone screens

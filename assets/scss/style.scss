@@ -1,6 +1,7 @@
 // import
 // import ./utilities/mixins.scss
 @use "./utilities/mixins.scss";
+@use "./layout/grid-layout.scss";
 /**
     RESET STYLES
 */
@@ -36,6 +37,7 @@ body {
   overflow-x: hidden;
   /* overflow-y: hidden; */
   transition: background-color 0.3s ease;
+  color: var(--color-black);
 }
 
 /* 6. Improve media defaults */
@@ -80,6 +82,12 @@ h6 {
   text-wrap: balance;
 }
 
+a {
+  text-decoration: none;
+  color: inherit;
+  display: block;
+}
+
 /*
   10. Create a root stacking context
 */
@@ -92,18 +100,26 @@ h6 {
   Variables
 */
 :root {
-  --color-white: #f9f9f9;
+  --color-white: #fafafa;
   --color-black: #221e1f;
   --color-blue: #71bff6;
   --color-pink: #ffa9c9;
   --color-grey: #c5cdcf;
+  --theme-color: #fafafa;
+
+  --ease-button: 0.5s cubic-bezier(0.19, 1, 0.22, 1);
+
+  --button-icon: var(--color-blue);
+  --button-bg: var(--color-white);
+  --button-text: var(--color-white);
+  --grid-color: var(--color-white);
 
   /* Desktop Grid */
   --grid-col-1: 16.7%;
   --grid-col-2: 9.73%;
   --grid-col-3: 38.85%;
   --grid-col-4: 34.73%;
-  --grid-margin: 50px;
+  --grid-margin: 5.4vw; /* 50px at 1920px */
   --grid-gap: 0px; /* Ajustez si nécessaire */
 
   /* Mobile Grid */
@@ -115,6 +131,13 @@ h6 {
   --font-cormorant: "Cormorant Garamond", serif;
 }
 
+.font-como {
+  font-family: var(--font-cormorant);
+}
+.font-inter {
+  font-family: var(--font-inter);
+}
+
 /**
   Containers
 */
@@ -123,8 +146,7 @@ h6 {
   margin-inline: var(--gutter-x);
 }
 
-.grid,
-.container-grid {
+.grid {
   display: grid;
   grid-template-columns: repeat(var(--columns), 1fr);
   grid-template-rows: repeat(var(--rows), 1fr);
@@ -164,14 +186,7 @@ h6 {
 
 /* Grid Desktop */
 .grid {
-  display: grid;
-  grid-template-columns:
-    var(--grid-col-1)
-    var(--grid-col-2)
-    var(--grid-col-3)
-    var(--grid-col-4);
-  gap: var(--grid-gap);
-  width: 100%;
+  @include grid;
 }
 
 /* Classes utilitaires pour spans de colonnes - Desktop */
@@ -278,7 +293,7 @@ h6 {
   right: 0;
   bottom: 0;
   pointer-events: none;
-  z-index: 9999;
+  z-index: 0;
   padding: 0 var(--grid-margin);
 }
 
@@ -294,9 +309,29 @@ h6 {
 }
 
 .grid-overlay-col {
-  background: rgba(255, 0, 0, 0.1);
-  border-left: 1px solid rgba(255, 0, 0, 0.3);
-  border-right: 1px solid rgba(255, 0, 0, 0.3);
+  position: relative;
+  &:after {
+    content: "";
+    top: 0;
+    left: 0;
+    position: absolute;
+    width: 1px;
+    height: 100%;
+    background-color: var(--grid-color);
+    opacity: 0.35;
+  }
+  &:last-child {
+    &::before {
+      content: "";
+      top: 0;
+      right: 0;
+      position: absolute;
+      width: 1px;
+      height: 100%;
+      background-color: var(--grid-color);
+      opacity: 0.35;
+    }
+  }
 }
 
 @media (max-width: 768px) {
@@ -424,7 +459,7 @@ html {
 
   .t1-h2,
   .type-1 h2 {
-    font-size: 15.5rem; /* 155px desktop */
+    font-size: 12.6rem; /* 155px desktop */
     line-height: 1.21; /* 187/155 */
   }
 
@@ -517,7 +552,7 @@ html {
 
   .t2-h2,
   .type-2 h2 {
-    font-size: 21rem; /* 210px desktop */
+    font-size: 18rem; /* 210px desktop */
     line-height: 1.21; /* 254.3/210 */
   }
 
@@ -578,6 +613,10 @@ html {
   font-weight: 700;
 }
 
+.font-italic {
+  font-style: italic;
+}
+
 /* Reset marges pour éviter conflits */
 .type-1 *,
 .type-2 * {
@@ -594,7 +633,8 @@ h3,
 h4,
 h5,
 h6,
-p {
+p,
+span {
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
