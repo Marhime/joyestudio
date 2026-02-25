@@ -22,12 +22,14 @@ const prevPos = new THREE.Vector2(0, 0);
 let moveSpeed = 0,
   smoothVelo = 0,
   time = 0,
-  tickCounter = 0;
+  tickCounter = 0,
+  trailStrength = 0;
 
 const guiParams = {
-  pixelSize: 0.005,
-  edgeWidth: 0.45,
-  flickerSpeed: 6,
+  pixelSize: 0.002,
+  edgeWidth: 0.33,
+  flickerSpeed: 20,
+  trailStretch: 0.1,
   color: "#ffe15a",
 };
 
@@ -54,29 +56,44 @@ const fragmentShader = /* glsl */ `
   varying vec3 vViewPosition;
   varying vec2 vUv;
 
-  uniform float time;
   uniform float uVelo;
   uniform float uTick;
   uniform float uPixelSize;
   uniform float uEdgeWidth;
+  uniform float uTrail;        // slow-decaying trail strength
+  uniform float uTrailStretch; // how much cells elongate in movement dir
+  uniform vec2  uVeloDir;      // normalized velocity direction
   uniform vec3  uColor;
 
   void main() {
     // Fresnel: 1 at center, 0 at silhouette
     float facing = max(0.0, dot(normalize(vNormal), -normalize(vViewPosition)));
-    float t = clamp(facing / (uEdgeWidth + uVelo * 1.8), 0.0, 1.0);
 
-    // Fine UV-space cells
-    float ps  = uPixelSize + uVelo * 0.025;
-    float cx  = floor(vUv.x / ps);
-    float cy  = floor(vUv.y / ps);
+    // Which side of the sphere is trailing?
+    // +1 = leading edge (front of movement), -1 = trailing edge (back)
+    vec2 velSafe   = normalize(uVeloDir + vec2(0.001));
+    float trailDot = dot(normalize(vNormal.xy + vec2(0.001)), velSafe);
+    float trailBias = (1.0 - trailDot) * 0.5; // 0 at leading, 1 at trailing
 
-    // Coarser layer offset to break grid regularity
-    float ps2 = ps * 2.3;
-    float cx2 = floor((vUv.x + ps * 0.7) / ps2);
-    float cy2 = floor((vUv.y + ps * 0.4) / ps2);
+    // Trailing edge dissolves much more than leading edge
+    float t = clamp(facing / (uEdgeWidth + uTrail * trailBias * 3.0), 0.0, 1.0);
 
-    // uTick is only incremented from JS when the sphere is moving
+    // ── Anisotropic cells: elongated along movement direction ─────────────
+    vec2 velPerp  = vec2(-velSafe.y, velSafe.x);
+    float uvAlong = dot(vUv - 0.5, velSafe);
+    float uvPerp  = dot(vUv - 0.5, velPerp);
+
+    // Cells stretch in movement direction proportionally to trail strength
+    float psAlong = uPixelSize * (1.0 + uTrail * uTrailStretch);
+    float psPerp  = uPixelSize;
+
+    float cx  = floor(uvAlong / psAlong);
+    float cy  = floor(uvPerp  / psPerp);
+
+    // Second coarser layer offset to break regularity
+    float cx2 = floor((uvAlong + psAlong * 0.7) / (psAlong * 2.2));
+    float cy2 = floor((uvPerp  + psPerp  * 0.4) / (psPerp  * 2.2));
+
     float r1  = fract(sin(cx  * 127.1 + cy  * 311.7 + uTick * 57.3) * 43758.5);
     float r2  = fract(sin(cx2 * 269.5 + cy2 * 183.3 + uTick * 31.7) * 23421.6);
     float rnd = r1 * 0.65 + r2 * 0.35;
@@ -148,12 +165,20 @@ const animate = () => {
 
   // Update shader uniforms
   const u = mesh.material.uniforms;
-  u.time.value = time;
   u.uVelo.value = smoothVelo;
   u.uPixelSize.value = guiParams.pixelSize;
   u.uEdgeWidth.value = guiParams.edgeWidth;
+  u.uTrailStretch.value = guiParams.trailStretch;
+  u.uVeloDir.value.set(velocityDir.x, velocityDir.y);
 
-  // Tick only advances when moving → pixels are static at rest
+  // trailStrength: rises fast with velocity, decays slowly after stop
+  // → trail lingers organically instead of cutting instantly
+  const targetTrail = Math.min(smoothVelo * 8.0, 1.0);
+  trailStrength +=
+    (targetTrail - trailStrength) * (targetTrail > trailStrength ? 0.15 : 0.03);
+  u.uTrail.value = trailStrength;
+
+  // Tick only advances when moving → pixels static at rest
   if (smoothVelo > 0.004) {
     tickCounter += smoothVelo * guiParams.flickerSpeed;
     u.uTick.value = Math.floor(tickCounter);
@@ -203,11 +228,13 @@ const init = () => {
     vertexShader,
     fragmentShader,
     uniforms: {
-      time: { value: 0 },
       uVelo: { value: 0 },
       uTick: { value: 0 },
+      uTrail: { value: 0 },
+      uTrailStretch: { value: guiParams.trailStretch },
       uPixelSize: { value: guiParams.pixelSize },
       uEdgeWidth: { value: guiParams.edgeWidth },
+      uVeloDir: { value: new THREE.Vector2(0, 0) },
       uColor: { value: new THREE.Color(props.color) },
     },
     transparent: true,
@@ -228,6 +255,7 @@ const init = () => {
 
     gui.add(guiParams, "pixelSize", 0.002, 0.03, 0.001).name("Pixel size");
     gui.add(guiParams, "edgeWidth", 0.2, 1.0, 0.01).name("Edge width");
+    gui.add(guiParams, "trailStretch", 0.0, 12.0, 0.5).name("Trail stretch");
     gui.add(guiParams, "flickerSpeed", 1, 20, 0.5).name("Flicker speed");
     gui
       .addColor(guiParams, "color")
