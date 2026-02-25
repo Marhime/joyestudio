@@ -26,7 +26,7 @@ let moveSpeed = 0,
   trailStrength = 0;
 
 const guiParams = {
-  pixelSize: 0.002,
+  pixelSize: 0.004,
   edgeWidth: 0.33,
   flickerSpeed: 20,
   trailStretch: 0.1,
