@@ -26,10 +26,26 @@ let moveSpeed = 0,
   trailStrength = 0;
 
 const guiParams = {
-  pixelSize: 0.004,
-  edgeWidth: 0.33,
-  flickerSpeed: 20,
+  // ── Shader / Appearance
+  pixelSize: 0.006,
+  edgeWidth: 0,
   trailStretch: 0.1,
+  flickerSpeed: 20,
+  solidStart: 0.82, // smoothstep lower bound for solid core
+  solidEnd: 1.0, // smoothstep upper bound for solid core
+  trailBias: 1, // how much trailing edge dissolves vs leading
+  coarseRatio: 1, // layer-2 cell size multiplier
+  // ── Motion
+  followLerp: 0.06, // mouse → followMouse speed
+  posLerp: 0.045, // followMouse → mesh position speed
+  tiltAmplY: 0.15, // max tilt amplitude on Y axis (mouse X)
+  tiltAmplX: 0.1, // max tilt amplitude on X axis (mouse Y)
+  tiltLerp: 0.04, // tilt smoothing speed
+  // ── Trail dynamics
+  trailRise: 0.15, // how fast trail builds up on movement
+  trailDecay: 0.03, // how fast trail fades after stopping
+  trailVeloMult: 8.0, // velocity → trail strength multiplier
+  // ── Color
   color: "#ffe15a",
 };
 
@@ -64,6 +80,10 @@ const fragmentShader = /* glsl */ `
   uniform float uTrailStretch; // how much cells elongate in movement dir
   uniform vec2  uVeloDir;      // normalized velocity direction
   uniform vec3  uColor;
+  uniform float uSolidStart;   // smoothstep lower bound for core
+  uniform float uSolidEnd;     // smoothstep upper bound for core
+  uniform float uTrailBias;    // trailing edge dissolve multiplier
+  uniform float uCoarseRatio;  // layer-2 cell size multiplier
 
   void main() {
     // Fresnel: 1 at center, 0 at silhouette
@@ -76,7 +96,7 @@ const fragmentShader = /* glsl */ `
     float trailBias = (1.0 - trailDot) * 0.5; // 0 at leading, 1 at trailing
 
     // Trailing edge dissolves much more than leading edge
-    float t = clamp(facing / (uEdgeWidth + uTrail * trailBias * 3.0), 0.0, 1.0);
+    float t = clamp(facing / (uEdgeWidth + uTrail * trailBias * uTrailBias), 0.0, 1.0);
 
     // ── Anisotropic cells: elongated along movement direction ─────────────
     vec2 velPerp  = vec2(-velSafe.y, velSafe.x);
@@ -91,15 +111,15 @@ const fragmentShader = /* glsl */ `
     float cy  = floor(uvPerp  / psPerp);
 
     // Second coarser layer offset to break regularity
-    float cx2 = floor((uvAlong + psAlong * 0.7) / (psAlong * 2.2));
-    float cy2 = floor((uvPerp  + psPerp  * 0.4) / (psPerp  * 2.2));
+    float cx2 = floor((uvAlong + psAlong * 0.7) / (psAlong * uCoarseRatio));
+    float cy2 = floor((uvPerp  + psPerp  * 0.4) / (psPerp  * uCoarseRatio));
 
     float r1  = fract(sin(cx  * 127.1 + cy  * 311.7 + uTick * 57.3) * 43758.5);
     float r2  = fract(sin(cx2 * 269.5 + cy2 * 183.3 + uTick * 31.7) * 23421.6);
     float rnd = r1 * 0.65 + r2 * 0.35;
 
     float spray = step(1.0 - t, rnd);
-    float solid = smoothstep(0.82, 1.0, t);
+    float solid = smoothstep(uSolidStart, uSolidEnd, t);
 
     gl_FragColor = vec4(uColor, max(solid, spray));
   }
@@ -136,13 +156,13 @@ const animate = () => {
   time += 0.016;
 
   // Smooth mouse follow
-  followMouse.x += (mouse.x - followMouse.x) * 0.06;
-  followMouse.y += (mouse.y - followMouse.y) * 0.06;
+  followMouse.x += (mouse.x - followMouse.x) * guiParams.followLerp;
+  followMouse.y += (mouse.y - followMouse.y) * guiParams.followLerp;
 
   const tx = (followMouse.x - 0.5) * props.followRange;
   const ty = (followMouse.y - 0.5) * props.followRange;
-  mesh.position.x += (tx - mesh.position.x) * 0.045;
-  mesh.position.y += (ty - mesh.position.y) * 0.045;
+  mesh.position.x += (tx - mesh.position.x) * guiParams.posLerp;
+  mesh.position.y += (ty - mesh.position.y) * guiParams.posLerp;
 
   // Velocity tracking
   const vx = mesh.position.x - prevPos.x;
@@ -170,12 +190,17 @@ const animate = () => {
   u.uEdgeWidth.value = guiParams.edgeWidth;
   u.uTrailStretch.value = guiParams.trailStretch;
   u.uVeloDir.value.set(velocityDir.x, velocityDir.y);
+  u.uSolidStart.value = guiParams.solidStart;
+  u.uSolidEnd.value = guiParams.solidEnd;
+  u.uTrailBias.value = guiParams.trailBias;
+  u.uCoarseRatio.value = guiParams.coarseRatio;
 
   // trailStrength: rises fast with velocity, decays slowly after stop
   // → trail lingers organically instead of cutting instantly
-  const targetTrail = Math.min(smoothVelo * 8.0, 1.0);
+  const targetTrail = Math.min(smoothVelo * guiParams.trailVeloMult, 1.0);
   trailStrength +=
-    (targetTrail - trailStrength) * (targetTrail > trailStrength ? 0.15 : 0.03);
+    (targetTrail - trailStrength) *
+    (targetTrail > trailStrength ? guiParams.trailRise : guiParams.trailDecay);
   u.uTrail.value = trailStrength;
 
   // Tick only advances when moving → pixels static at rest
@@ -185,8 +210,12 @@ const animate = () => {
   }
 
   // Subtle tilt toward mouse
-  mesh.rotation.y += ((followMouse.x - 0.5) * 0.4 - mesh.rotation.y) * 0.04;
-  mesh.rotation.x += ((followMouse.y - 0.5) * -0.3 - mesh.rotation.x) * 0.04;
+  mesh.rotation.y +=
+    ((followMouse.x - 0.5) * guiParams.tiltAmplY - mesh.rotation.y) *
+    guiParams.tiltLerp;
+  mesh.rotation.x +=
+    ((followMouse.y - 0.5) * -guiParams.tiltAmplX - mesh.rotation.x) *
+    guiParams.tiltLerp;
 
   renderer.render(scene, camera);
   frameId = requestAnimationFrame(animate);
@@ -236,6 +265,10 @@ const init = () => {
       uEdgeWidth: { value: guiParams.edgeWidth },
       uVeloDir: { value: new THREE.Vector2(0, 0) },
       uColor: { value: new THREE.Color(props.color) },
+      uSolidStart: { value: guiParams.solidStart },
+      uSolidEnd: { value: guiParams.solidEnd },
+      uTrailBias: { value: guiParams.trailBias },
+      uCoarseRatio: { value: guiParams.coarseRatio },
     },
     transparent: true,
     depthWrite: false,
@@ -250,13 +283,37 @@ const init = () => {
 
   // ─── lil-gui ─────────────────────────────────────────────────────────
   import("lil-gui").then(({ default: GUI }) => {
-    gui = new GUI({ title: "Pixel Blob" });
+    gui = new GUI({ title: "✦ Pixel Blob", width: 270 });
     const u = mesh.material.uniforms;
 
-    gui.add(guiParams, "pixelSize", 0.002, 0.03, 0.001).name("Pixel size");
-    gui.add(guiParams, "edgeWidth", 0.2, 1.0, 0.01).name("Edge width");
-    gui.add(guiParams, "trailStretch", 0.0, 12.0, 0.5).name("Trail stretch");
-    gui.add(guiParams, "flickerSpeed", 1, 20, 0.5).name("Flicker speed");
+    // ── Appearance ─────────────────────────────────────────────────────
+    const fAppear = gui.addFolder("◈ Appearance");
+    fAppear.add(guiParams, "pixelSize", 0.001, 0.03, 0.001).name("Pixel size");
+    fAppear.add(guiParams, "edgeWidth", 0.05, 1.2, 0.01).name("Edge width");
+    fAppear.add(guiParams, "solidStart", 0.3, 0.98, 0.01).name("Solid start");
+    fAppear.add(guiParams, "solidEnd", 0.5, 1.0, 0.01).name("Solid end");
+    fAppear.add(guiParams, "coarseRatio", 1.0, 5.0, 0.1).name("Coarse layer");
+
+    // ── Trail ──────────────────────────────────────────────────────────
+    const fTrail = gui.addFolder("↝ Trail");
+    fTrail.add(guiParams, "trailStretch", 0.0, 12.0, 0.5).name("Stretch");
+    fTrail.add(guiParams, "trailBias", 0.0, 8.0, 0.1).name("Edge bias");
+    fTrail.add(guiParams, "flickerSpeed", 1, 20, 0.5).name("Flicker speed");
+    fTrail.add(guiParams, "trailVeloMult", 1.0, 20.0, 0.5).name("Velo → trail");
+    fTrail.add(guiParams, "trailRise", 0.01, 0.3, 0.005).name("Rise speed");
+    fTrail.add(guiParams, "trailDecay", 0.005, 0.15, 0.005).name("Decay speed");
+    fTrail.open(false);
+
+    // ── Motion ─────────────────────────────────────────────────────────
+    const fMotion = gui.addFolder("⤳ Motion");
+    fMotion.add(guiParams, "followLerp", 0.01, 0.3, 0.005).name("Mouse follow");
+    fMotion.add(guiParams, "posLerp", 0.01, 0.2, 0.005).name("Pos lerp");
+    fMotion.add(guiParams, "tiltAmplY", 0.0, 0.6, 0.01).name("Tilt X-axis");
+    fMotion.add(guiParams, "tiltAmplX", 0.0, 0.6, 0.01).name("Tilt Y-axis");
+    fMotion.add(guiParams, "tiltLerp", 0.01, 0.2, 0.005).name("Tilt speed");
+    fMotion.open(false);
+
+    // ── Color ──────────────────────────────────────────────────────────
     gui
       .addColor(guiParams, "color")
       .name("Color")
