@@ -5,16 +5,20 @@
 <script setup>
 import { onMounted, onBeforeUnmount, ref } from "vue";
 import * as THREE from "three";
+import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
+import modelUrl from "~/assets/3D/smileyV2.glb?url";
 
 const props = defineProps({
   color: { type: Number, default: 0xffe15a },
-  radius: { type: Number, default: 90 },
+  radius: { type: Number, default: 28 },
   followRange: { type: Number, default: 150 },
 });
 
 const container = ref(null);
 
 let renderer, scene, camera, mesh, geometry, frameId, gui;
+const meshes = []; // sphere sub-meshes with shader → shared uniform updates
+let featureMeshes = []; // eyes + mouth → MeshBasicMaterial
 const mouse = new THREE.Vector2(0.5, 0.5);
 const followMouse = new THREE.Vector2(0.5, 0.5);
 const velocityDir = new THREE.Vector2(0, 0);
@@ -47,6 +51,7 @@ const guiParams = {
   trailVeloMult: 8.0, // velocity → trail strength multiplier
   // ── Color
   color: "#ffe15a",
+  featureColor: "#1a1408", // eyes + mouth
 };
 
 // ─── Shaders ───────────────────────────────────────────────────────────────
@@ -183,17 +188,29 @@ const animate = () => {
   const clamped = Math.min(moveSpeed * 0.025, 0.12);
   smoothVelo += (clamped - smoothVelo) * 0.08;
 
-  // Update shader uniforms
-  const u = mesh.material.uniforms;
-  u.uVelo.value = smoothVelo;
-  u.uPixelSize.value = guiParams.pixelSize;
-  u.uEdgeWidth.value = guiParams.edgeWidth;
-  u.uTrailStretch.value = guiParams.trailStretch;
-  u.uVeloDir.value.set(velocityDir.x, velocityDir.y);
-  u.uSolidStart.value = guiParams.solidStart;
-  u.uSolidEnd.value = guiParams.solidEnd;
-  u.uTrailBias.value = guiParams.trailBias;
-  u.uCoarseRatio.value = guiParams.coarseRatio;
+  // Update shader uniforms on all sub-meshes
+  const sharedUniforms = {
+    uVelo: smoothVelo,
+    uPixelSize: guiParams.pixelSize,
+    uEdgeWidth: guiParams.edgeWidth,
+    uTrailStretch: guiParams.trailStretch,
+    uSolidStart: guiParams.solidStart,
+    uSolidEnd: guiParams.solidEnd,
+    uTrailBias: guiParams.trailBias,
+    uCoarseRatio: guiParams.coarseRatio,
+  };
+  for (const m of meshes) {
+    const u = m.material.uniforms;
+    u.uVelo.value = sharedUniforms.uVelo;
+    u.uPixelSize.value = sharedUniforms.uPixelSize;
+    u.uEdgeWidth.value = sharedUniforms.uEdgeWidth;
+    u.uTrailStretch.value = sharedUniforms.uTrailStretch;
+    u.uVeloDir.value.set(velocityDir.x, velocityDir.y);
+    u.uSolidStart.value = sharedUniforms.uSolidStart;
+    u.uSolidEnd.value = sharedUniforms.uSolidEnd;
+    u.uTrailBias.value = sharedUniforms.uTrailBias;
+    u.uCoarseRatio.value = sharedUniforms.uCoarseRatio;
+  }
 
   // trailStrength: rises fast with velocity, decays slowly after stop
   // → trail lingers organically instead of cutting instantly
@@ -201,12 +218,13 @@ const animate = () => {
   trailStrength +=
     (targetTrail - trailStrength) *
     (targetTrail > trailStrength ? guiParams.trailRise : guiParams.trailDecay);
-  u.uTrail.value = trailStrength;
+  for (const m of meshes) m.material.uniforms.uTrail.value = trailStrength;
 
   // Tick only advances when moving → pixels static at rest
   if (smoothVelo > 0.004) {
     tickCounter += smoothVelo * guiParams.flickerSpeed;
-    u.uTick.value = Math.floor(tickCounter);
+    for (const m of meshes)
+      m.material.uniforms.uTick.value = Math.floor(tickCounter);
   }
 
   // Subtle tilt toward mouse
@@ -251,32 +269,59 @@ const init = () => {
   camera = new THREE.PerspectiveCamera(45, w / h, 0.1, 2000);
   camera.position.set(0, 0, 450);
 
-  geometry = new THREE.SphereGeometry(1, 64, 64);
+  // ── Shared material factory ────────────────────────────────────────
+  const makeMaterial = (color) =>
+    new THREE.ShaderMaterial({
+      vertexShader,
+      fragmentShader,
+      uniforms: {
+        uVelo: { value: 0 },
+        uTick: { value: 0 },
+        uTrail: { value: 0 },
+        uTrailStretch: { value: guiParams.trailStretch },
+        uPixelSize: { value: guiParams.pixelSize },
+        uEdgeWidth: { value: guiParams.edgeWidth },
+        uVeloDir: { value: new THREE.Vector2(0, 0) },
+        uColor: { value: new THREE.Color(color) },
+        uSolidStart: { value: guiParams.solidStart },
+        uSolidEnd: { value: guiParams.solidEnd },
+        uTrailBias: { value: guiParams.trailBias },
+        uCoarseRatio: { value: guiParams.coarseRatio },
+      },
+      transparent: true,
+      depthWrite: false,
+    });
 
-  const material = new THREE.ShaderMaterial({
-    vertexShader,
-    fragmentShader,
-    uniforms: {
-      uVelo: { value: 0 },
-      uTick: { value: 0 },
-      uTrail: { value: 0 },
-      uTrailStretch: { value: guiParams.trailStretch },
-      uPixelSize: { value: guiParams.pixelSize },
-      uEdgeWidth: { value: guiParams.edgeWidth },
-      uVeloDir: { value: new THREE.Vector2(0, 0) },
-      uColor: { value: new THREE.Color(props.color) },
-      uSolidStart: { value: guiParams.solidStart },
-      uSolidEnd: { value: guiParams.solidEnd },
-      uTrailBias: { value: guiParams.trailBias },
-      uCoarseRatio: { value: guiParams.coarseRatio },
-    },
-    transparent: true,
-    depthWrite: false,
-  });
+  // ── GLB Load ──────────────────────────────────────────────────
+  // Feature mesh names — matches L_Eye, R_Eye, GPencil
+  const FEATURE_NAMES = ["eye", "gpencil", "mouth"];
+  const isFeature = (name) =>
+    FEATURE_NAMES.some((k) => name.toLowerCase().includes(k));
 
-  mesh = new THREE.Mesh(geometry, material);
+  mesh = new THREE.Group();
   mesh.scale.setScalar(props.radius);
   scene.add(mesh);
+
+  new GLTFLoader().load(modelUrl, (gltf) => {
+    gltf.scene.traverse((child) => {
+      if (!child.isMesh) return;
+      console.log("mesh found:", child.name);
+      if (isFeature(child.name)) {
+        // Features → solid fill, no pixel effect
+        child.material = new THREE.MeshBasicMaterial({
+          color: new THREE.Color(guiParams.featureColor),
+          transparent: false,
+          depthWrite: true,
+        });
+        featureMeshes.push(child);
+      } else {
+        // Sphere → full pixel shader
+        child.material = makeMaterial(guiParams.color);
+        meshes.push(child);
+      }
+    });
+    mesh.add(gltf.scene);
+  });
 
   window.addEventListener("resize", resize);
   window.addEventListener("pointermove", onPointerMove);
@@ -284,7 +329,6 @@ const init = () => {
   // ─── lil-gui ─────────────────────────────────────────────────────────
   import("lil-gui").then(({ default: GUI }) => {
     gui = new GUI({ title: "✦ Pixel Blob", width: 270 });
-    const u = mesh.material.uniforms;
 
     // ── Appearance ─────────────────────────────────────────────────────
     const fAppear = gui.addFolder("◈ Appearance");
@@ -314,11 +358,22 @@ const init = () => {
     fMotion.open(false);
 
     // ── Color ──────────────────────────────────────────────────────────
+    const FEATURE_NAMES = ["eye", "gpencil", "mouth"];
+    const isFeature = (n) =>
+      FEATURE_NAMES.some((k) => n.toLowerCase().includes(k));
+
     gui
       .addColor(guiParams, "color")
-      .name("Color")
+      .name("Body color")
       .onChange((v) => {
-        u.uColor.value.set(v);
+        for (const m of meshes)
+          if (!isFeature(m.name)) m.material.uniforms.uColor.value.set(v);
+      });
+    gui
+      .addColor(guiParams, "featureColor")
+      .name("Face color")
+      .onChange((v) => {
+        for (const m of featureMeshes) m.material.color.set(v);
       });
   });
 
@@ -338,7 +393,8 @@ onBeforeUnmount(() => {
     onContextRestored,
   );
   geometry?.dispose();
-  mesh?.material?.dispose();
+  for (const m of meshes) m.material?.dispose();
+  for (const m of featureMeshes) m.material?.dispose();
   renderer?.dispose();
   renderer?.domElement?.parentNode?.removeChild(renderer.domElement);
 });

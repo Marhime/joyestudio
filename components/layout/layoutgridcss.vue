@@ -30,6 +30,12 @@
 import { debounce } from "~/utils/debounce";
 
 const { $gsap } = useNuxtApp();
+const {
+  init: initFlip,
+  setInitialPositions,
+  addToTimeline: addFlipToTimeline,
+  reset: resetFlip,
+} = useLogoFlip();
 
 const gridContainer = ref(null);
 const verticalLine = ref(null);
@@ -102,11 +108,6 @@ const calculateGridSize = () => {
   });
 };
 
-// Debounced resize handler
-const handleResize = debounce(() => {
-  calculateGridSize();
-}, 150);
-
 /**
  * Setup event listeners on squares
  * Called after squares are mounted
@@ -136,10 +137,187 @@ const setupEventListeners = () => {
   });
 };
 
+// get first row of squares
+const getFirstRowSquares = () => {
+  const firstRowSquares = [];
+  for (let i = 0; i < currentCols.value; i++) {
+    if (squareRefs.value[i]) {
+      firstRowSquares.push(squareRefs.value[i]);
+    }
+  }
+  return firstRowSquares;
+};
+
+const getRows = (rowNumbers) => {
+  const rows = [];
+  rowNumbers.forEach((rowNum) => {
+    const rowSquares = [];
+    for (
+      let i = rowNum * currentCols.value;
+      i < (rowNum + 1) * currentCols.value;
+      i++
+    ) {
+      if (squareRefs.value[i]) {
+        rowSquares.push(squareRefs.value[i]);
+      }
+    }
+    rows.push(rowSquares);
+  });
+  return rows;
+};
+
+const getAllSquaresWithoutSome = (excludeIndices) => {
+  return squareRefs.value.filter((_, index) => !excludeIndices.includes(index));
+};
+
+// animation keyframes
+const animateChangeColor = () => {
+  const root = document.documentElement;
+  const firstRow = getRows([0]);
+  const firstAndSecondRow = getRows([0, 1]);
+
+  const menuSquares = firstRow[0][0]; // First 8 squares of the first two rows (menu area)
+
+  const logoSquares = [firstRow[0][5]]; // Just the squares behind the logo (columns 4-7 of the first row)
+
+  const buttonSquares = [
+    firstRow[0][firstRow[0].length - 1], // Last column of the first row
+    firstRow[0][firstRow[0].length - 2],
+    firstRow[0][firstRow[0].length - 3],
+  ]; // First 4 columns of the first two rows
+
+  const logoAndButtonSquares = [...logoSquares, ...buttonSquares];
+
+  const allExceptLogoAndButtonSquares = getAllSquaresWithoutSome(
+    logoAndButtonSquares.map((sq) => squareRefs.value.indexOf(sq)),
+  );
+
+  console.log("Animating squares:", {
+    firstRow,
+    firstRowLength: firstRow[0].length,
+    firstAndSecondRow,
+    logoSquares,
+    allExceptLogoAndButtonSquares,
+  });
+
+  // Prépare les logos hero en position fixe et capture la destination (header)
+  setInitialPositions();
+
+  const tl = $gsap.timeline({
+    scrollTrigger: {
+      trigger: gridContainer.value,
+      start: "top top",
+      end: "50% top",
+      scrub: true,
+      markers: true,
+    },
+    defaults: { ease: "power1.inOut" },
+  });
+
+  // Logo flip : démarre en même temps que allExceptLogoAndButtonSquares
+  addFlipToTimeline(tl, 0);
+
+  tl.to(allExceptLogoAndButtonSquares, {
+    backgroundColor: "var(--color-white)",
+    duration: 0.5,
+    stagger: {
+      from: "random",
+      amount: 1.5,
+    },
+  })
+    .to(
+      menuSquares,
+      {
+        backgroundColor: "var(--color-white)",
+        duration: 0.5,
+      },
+      1.5,
+    )
+
+    .to(
+      ".button-wrapper",
+      {
+        autoAlpha: 0,
+        duration: 0.5,
+      },
+      "<",
+    )
+
+    .to(
+      logoSquares,
+      {
+        backgroundColor: "var(--color-white)",
+        duration: 0.5,
+        stagger: {
+          from: "center",
+          amount: 1.5,
+        },
+      },
+      "<",
+    )
+
+    .to(
+      ["[hero-logo-left]", "[hero-logo-right]"],
+      {
+        color: "var(--color-black)",
+        duration: 0.5,
+      },
+      "<",
+    )
+
+    .to(
+      buttonSquares,
+      {
+        backgroundColor: "var(--color-white)",
+        duration: 0.5,
+      },
+      "<",
+    )
+    .to(
+      ".header .button__bg",
+      {
+        backgroundColor: "var(--color-blue)",
+      },
+      "<",
+    )
+    .to(
+      ".header .button__label",
+      {
+        color: "var(--color-blue)",
+      },
+      "<",
+    )
+    .to(
+      ".header .button__icon",
+      {
+        color: "var(--color-white)",
+      },
+      "<",
+    )
+
+    .to(
+      ["[header-logo-left]", "[header-logo-right]"],
+      {
+        color: "var(--color-black)",
+        duration: 0.5,
+      },
+      "<",
+    );
+};
+
+// Debounced resize handler
+const handleResize = debounce(() => {
+  resetFlip(); // Nettoie les états Flip avant de recalculer
+  calculateGridSize();
+  console.log("First row squares:", getFirstRowSquares());
+}, 150);
+
 // Watch for changes in totalSquares to setup listeners when DOM is ready
 watch(totalSquares, async () => {
   await nextTick(); // Wait for DOM to update
   setupEventListeners();
+  initFlip(); // Sélectionne les éléments logo dans le DOM
+  animateChangeColor();
 });
 
 onMounted(() => {
@@ -165,7 +343,6 @@ defineExpose({
   left: 0;
   width: 100vw;
   min-height: 100vh;
-  z-index: 20;
 }
 
 .artistic-grid {

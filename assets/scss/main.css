@@ -100,7 +100,7 @@ h6 {
   --grid-col-2: 9.73%;
   --grid-col-3: 38.85%;
   --grid-col-4: 34.73%;
-  --grid-margin: 2.604166666666667;
+  --grid-margin: 50px;
   --grid-gap: 0px; /* Ajustez si nécessaire */
 
   /* Mobile Grid */

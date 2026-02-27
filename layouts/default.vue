@@ -8,6 +8,7 @@
         <slot />
       </main>
     </div>
+    <LayoutGridCss />
   </div>
 </template>
 

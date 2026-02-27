@@ -126,9 +126,6 @@ defineProps(["href", "label", "labelSecondary", "target"]);
 </script>
 
 <style lang="scss">
-.button-wrapper {
-}
-
 .button {
   display: flex;
   position: relative;

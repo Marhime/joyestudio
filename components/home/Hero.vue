@@ -170,116 +170,97 @@ onMounted(() => {
   changeThemeTo("color");
   setShowLogo(false);
 
-  const logoLeftRef = document.querySelector("[hero-logo-left]");
-  const logoRightRef = document.querySelector("[hero-logo-right]");
-  const finalLeftContainer = document.querySelector("[header-logo-left]");
-  const finalRightContainer = document.querySelector("[header-logo-right]");
-  const logoLeftPlaceholderRef = document.querySelector(
-    "[hero-placeholder-left]",
-  );
-  const logoRightPlaceholderRef = document.querySelector(
-    "[hero-placeholder-right]",
-  );
-  const mainGrid = document.getElementById("main-grid");
-  let blocks;
+  // const logoLeftRef = document.querySelector("[hero-logo-left]");
+  // const logoRightRef = document.querySelector("[hero-logo-right]");
+  // const finalLeftContainer = document.querySelector("[header-logo-left]");
+  // const finalRightContainer = document.querySelector("[header-logo-right]");
+  // const logoLeftPlaceholderRef = document.querySelector(
+  //   "[hero-placeholder-left]",
+  // );
+  // const logoRightPlaceholderRef = document.querySelector(
+  //   "[hero-placeholder-right]",
+  // );
 
-  let initialLeftRect;
-  let initialRightRect;
-  let finalStateLeft;
-  let finalStateRight;
+  // let initialLeftRect;
+  // let initialRightRect;
+  // let finalStateLeft;
+  // let finalStateRight;
 
-  const updatePositions = () => {
-    initialLeftRect = logoLeftPlaceholderRef?.getBoundingClientRect();
-    initialRightRect = logoRightPlaceholderRef?.getBoundingClientRect();
+  // const updatePositions = () => {
+  //   initialLeftRect = logoLeftPlaceholderRef?.getBoundingClientRect();
+  //   initialRightRect = logoRightPlaceholderRef?.getBoundingClientRect();
 
-    const scrollY = window.scrollY || window.pageYOffset;
+  //   const scrollY = window.scrollY || window.pageYOffset;
 
-    $gsap.set(logoLeftRef, {
-      position: "fixed",
-      top: initialLeftRect?.top + scrollY,
-      left: initialLeftRect?.left,
-      width: initialLeftRect?.width,
-      height: initialLeftRect?.height,
-      zIndex: 1000,
-    });
+  //   $gsap.set(logoLeftRef, {
+  //     position: "fixed",
+  //     top: initialLeftRect?.top + scrollY,
+  //     left: initialLeftRect?.left,
+  //     width: initialLeftRect?.width,
+  //     height: initialLeftRect?.height,
+  //     zIndex: 1000,
+  //   });
 
-    $gsap.set(logoRightRef, {
-      position: "fixed",
-      top: initialRightRect?.top + scrollY,
-      left: initialRightRect?.left,
-      width: initialRightRect?.width,
-      height: initialRightRect?.height,
-      zIndex: 1000,
-    });
-  };
+  //   $gsap.set(logoRightRef, {
+  //     position: "fixed",
+  //     top: initialRightRect?.top + scrollY,
+  //     left: initialRightRect?.left,
+  //     width: initialRightRect?.width,
+  //     height: initialRightRect?.height,
+  //     zIndex: 1000,
+  //   });
+  // };
 
-  const createFlipAnimation = () => {
-    // revalidate positions
-    ctx?.revert();
+  // const createFlipAnimation = () => {
+  //   // revalidate positions
+  //   ctx?.revert();
 
-    blocks = mainGrid.querySelectorAll(".grid-layout-block");
+  //   // set fixed when the context is active (avoids layout shifts before context)
+  //   ctx = $gsap.context(() => {
+  //     updatePositions();
+  //     finalStateLeft = $Flip.getState(finalLeftContainer);
+  //     finalStateRight = $Flip.getState(finalRightContainer);
 
-    // set fixed when the context is active (avoids layout shifts before context)
-    ctx = $gsap.context(() => {
-      updatePositions();
-      finalStateLeft = $Flip.getState(finalLeftContainer);
-      finalStateRight = $Flip.getState(finalRightContainer);
+  //     console.log(buttonWrapperRef.value);
+  //     const tl = $gsap.timeline({
+  //       scrollTrigger: {
+  //         trigger: sectionRef.value,
+  //         start: "top top",
+  //         end: "bottom 60%",
+  //         scrub: 1,
+  //         markers: true,
+  //         id: "logo",
+  //       },
+  //     });
 
-      console.log(buttonWrapperRef.value);
-      const tl = $gsap.timeline({
-        scrollTrigger: {
-          trigger: sectionRef.value,
-          start: "top top",
-          end: "bottom 20%",
-          scrub: 1,
-          // markers: true,
-          id: "logo",
-          onEnterBack: () => {
-            changeThemeTo("color");
-            $gsap.set(buttonWrapperRef.value, { zIndex: 2 });
-          },
-          onLeave: () => {
-            changeThemeTo("white");
-            $gsap.set(buttonWrapperRef.value, { zIndex: 0 });
-          },
-        },
-      });
+  //     const flipConfig = {
+  //       ease: "none",
+  //       duration: 1,
+  //     };
 
-      const flipConfig = {
-        ease: "none",
-        duration: 1,
-      };
+  //     tl.add($Flip.fit(logoLeftRef, finalStateLeft, flipConfig), 0).add(
+  //       $Flip.fit(logoRightRef, finalStateRight, flipConfig),
+  //       "<",
+  //     );
+  //   });
+  // };
 
-      tl.add($Flip.fit(logoLeftRef, finalStateLeft, flipConfig), 0)
-        .add($Flip.fit(logoRightRef, finalStateRight, flipConfig), "<")
-        .to(
-          $gsap.utils.shuffle([...blocks]),
-          {
-            stagger: 0.007,
-            backgroundColor: "rgb(255, 255, 255)",
-            ease: "power2.inOut",
-          },
-          0.9,
-        );
-    });
-  };
+  // const debouncedCreateFlipAnimation = debounce(() => {
+  //   createFlipAnimation();
+  // }, 200);
 
-  const debouncedCreateFlipAnimation = debounce(() => {
-    createFlipAnimation();
-  }, 200);
+  // nextTick(() => {
+  //   createFlipAnimation();
+  // });
 
-  nextTick(() => {
-    createFlipAnimation();
-  });
-
-  window.addEventListener("resize", () => {
-    debouncedCreateFlipAnimation();
-  });
+  // window.addEventListener("resize", () => {
+  //   debouncedCreateFlipAnimation();
+  // });
 });
 
-onUnmounted(() => {
-  ctx?.revert();
-});
+// onUnmounted(() => {
+//   ctx?.revert();
+// });
 </script>
 <style lang="scss" scoped>
 .hero-section {
@@ -303,7 +284,7 @@ onUnmounted(() => {
   display: flex;
   justify-content: space-between;
   flex-direction: column;
-  gap: 6rem;
+  gap: 2rem;
   position: relative;
   color: var(--theme-color);
 

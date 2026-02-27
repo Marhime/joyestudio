@@ -1,5 +1,7 @@
 <template>
   <Hero />
+  <About />
+  <Services />
 </template>
 
 <script lang="ts" setup>

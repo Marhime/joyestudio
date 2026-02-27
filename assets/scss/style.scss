@@ -100,7 +100,7 @@ a {
   Variables
 */
 :root {
-  --color-white: #fafafa;
+  --color-white: #f9f9f9;
   --color-black: #221e1f;
   --color-blue: #71bff6;
   --color-pink: #ffa9c9;
@@ -119,7 +119,7 @@ a {
   --grid-col-2: 9.73%;
   --grid-col-3: 38.85%;
   --grid-col-4: 34.73%;
-  --grid-margin: 5.4vw; /* 50px at 1920px */
+  --grid-margin: 2.7vw; /* 50px at 1920px */
   --grid-gap: 0px; /* Ajustez si nécessaire */
 
   /* Mobile Grid */
@@ -376,13 +376,6 @@ html {
 @media only screen and (min-width: 1024px) {
   html {
     font-size: 0.625vw;
-  }
-}
-
-/* 4K et plus (2560px+) : Cap à 16px pour éviter trop gros */
-@media only screen and (min-width: 2560px) {
-  html {
-    font-size: 16px;
   }
 }
 

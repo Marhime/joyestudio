@@ -131,9 +131,10 @@ onUnmounted(() => {
 .about {
   position: relative;
   z-index: 1;
-  padding-block: 10rem;
+  padding-top: 10rem;
+  padding-bottom: 6.6rem;
   @include respond-to("desktop") {
-    padding-block: 30rem;
+    padding-top: 30rem;
   }
   &__wrapper {
     .face-placeholder {
@@ -205,9 +206,6 @@ onUnmounted(() => {
 
     &-line {
       line-height: 1;
-      span {
-        overflow: hidden;
-      }
       &--1 {
         grid-column-start: 2;
         grid-column-end: 5;

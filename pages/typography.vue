@@ -124,14 +124,9 @@
 
 <script setup></script>
 
-<style>
+<style scoped>
 section {
-  min-height: 100svh;
   background-color: var(--color-dark);
   color: var(--color-light);
-}
-
-section > * {
-  margin-bottom: 3rem;
 }
 </style>
