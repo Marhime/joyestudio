@@ -152,115 +152,12 @@
         </div>
       </div>
     </div>
+    <LayoutLines class="line-hero" color="black" />
   </section>
 </template>
 
 <script setup>
 import ButtonComponent from "../layout/ButtonComponent.vue";
-
-const { $gsap, $Flip, $lenis } = useNuxtApp();
-const { currentTheme, changeThemeTo, setShowLogo } = useThemeStore();
-
-const sectionRef = ref(null);
-const buttonWrapperRef = ref(null);
-
-let ctx;
-
-onMounted(() => {
-  changeThemeTo("color");
-  setShowLogo(false);
-
-  // const logoLeftRef = document.querySelector("[hero-logo-left]");
-  // const logoRightRef = document.querySelector("[hero-logo-right]");
-  // const finalLeftContainer = document.querySelector("[header-logo-left]");
-  // const finalRightContainer = document.querySelector("[header-logo-right]");
-  // const logoLeftPlaceholderRef = document.querySelector(
-  //   "[hero-placeholder-left]",
-  // );
-  // const logoRightPlaceholderRef = document.querySelector(
-  //   "[hero-placeholder-right]",
-  // );
-
-  // let initialLeftRect;
-  // let initialRightRect;
-  // let finalStateLeft;
-  // let finalStateRight;
-
-  // const updatePositions = () => {
-  //   initialLeftRect = logoLeftPlaceholderRef?.getBoundingClientRect();
-  //   initialRightRect = logoRightPlaceholderRef?.getBoundingClientRect();
-
-  //   const scrollY = window.scrollY || window.pageYOffset;
-
-  //   $gsap.set(logoLeftRef, {
-  //     position: "fixed",
-  //     top: initialLeftRect?.top + scrollY,
-  //     left: initialLeftRect?.left,
-  //     width: initialLeftRect?.width,
-  //     height: initialLeftRect?.height,
-  //     zIndex: 1000,
-  //   });
-
-  //   $gsap.set(logoRightRef, {
-  //     position: "fixed",
-  //     top: initialRightRect?.top + scrollY,
-  //     left: initialRightRect?.left,
-  //     width: initialRightRect?.width,
-  //     height: initialRightRect?.height,
-  //     zIndex: 1000,
-  //   });
-  // };
-
-  // const createFlipAnimation = () => {
-  //   // revalidate positions
-  //   ctx?.revert();
-
-  //   // set fixed when the context is active (avoids layout shifts before context)
-  //   ctx = $gsap.context(() => {
-  //     updatePositions();
-  //     finalStateLeft = $Flip.getState(finalLeftContainer);
-  //     finalStateRight = $Flip.getState(finalRightContainer);
-
-  //     console.log(buttonWrapperRef.value);
-  //     const tl = $gsap.timeline({
-  //       scrollTrigger: {
-  //         trigger: sectionRef.value,
-  //         start: "top top",
-  //         end: "bottom 60%",
-  //         scrub: 1,
-  //         markers: true,
-  //         id: "logo",
-  //       },
-  //     });
-
-  //     const flipConfig = {
-  //       ease: "none",
-  //       duration: 1,
-  //     };
-
-  //     tl.add($Flip.fit(logoLeftRef, finalStateLeft, flipConfig), 0).add(
-  //       $Flip.fit(logoRightRef, finalStateRight, flipConfig),
-  //       "<",
-  //     );
-  //   });
-  // };
-
-  // const debouncedCreateFlipAnimation = debounce(() => {
-  //   createFlipAnimation();
-  // }, 200);
-
-  // nextTick(() => {
-  //   createFlipAnimation();
-  // });
-
-  // window.addEventListener("resize", () => {
-  //   debouncedCreateFlipAnimation();
-  // });
-});
-
-// onUnmounted(() => {
-//   ctx?.revert();
-// });
 </script>
 <style lang="scss" scoped>
 .hero-section {
@@ -268,11 +165,14 @@ onMounted(() => {
   width: 100%;
   height: 100vh;
   padding-top: 14.8rem;
-  z-index: 2;
 
   @include respond-to("desktop") {
     padding-top: 23.1vh;
   }
+}
+
+.line-hero {
+  z-index: 0;
 }
 
 .container {
@@ -298,7 +198,7 @@ onMounted(() => {
 
   .logo-left {
     position: relative;
-    z-index: 0;
+    z-index: 1;
     width: 85.76%;
     margin: auto;
     @include respond-to("desktop") {
@@ -311,7 +211,7 @@ onMounted(() => {
     position: relative;
     width: 99.12%;
     margin-left: auto;
-    z-index: 2;
+    z-index: 4;
 
     @include respond-to("desktop") {
       width: 46.09%;
@@ -333,7 +233,7 @@ onMounted(() => {
     transform: translate(-50%, -50%);
     width: 52.94%;
     z-index: 1;
-    // visibility: hidden;
+    visibility: hidden;
 
     @include respond-to("desktop") {
       left: 47%;

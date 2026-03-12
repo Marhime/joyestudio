@@ -92,7 +92,7 @@
           <ButtonComponent
             href="/contact"
             label="Book a call"
-            labelSecondary="Let’s talk  👋"
+            labelSecondary="Let’s talk"
           />
         </div>
       </nav>

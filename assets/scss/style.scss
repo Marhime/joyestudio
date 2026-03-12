@@ -2,6 +2,7 @@
 // import ./utilities/mixins.scss
 @use "./utilities/mixins.scss";
 @use "./layout/grid-layout.scss";
+@use "./base/reset.scss";
 /**
     RESET STYLES
 */
@@ -26,9 +27,6 @@
 }
 
 body {
-  /* 4. Add accessible line-height */
-  line-height: 1.2;
-
   /* 5. Improve text rendering */
   font-family: "Acumin Pro", sans-serif;
   -webkit-font-smoothing: antialiased;
@@ -102,33 +100,32 @@ a {
 :root {
   --color-white: #f9f9f9;
   --color-black: #221e1f;
-  --color-blue: #71bff6;
+  --color-blue: rgb(110, 191, 246);
   --color-pink: #ffa9c9;
   --color-grey: #c5cdcf;
   --theme-color: #fafafa;
 
   --ease-button: 0.5s cubic-bezier(0.19, 1, 0.22, 1);
 
-  --button-icon: var(--color-blue);
-  --button-bg: var(--color-white);
-  --button-text: var(--color-white);
-  --grid-color: var(--color-white);
-
   /* Desktop Grid */
-  --grid-col-1: 16.7%;
-  --grid-col-2: 9.73%;
-  --grid-col-3: 38.85%;
-  --grid-col-4: 34.73%;
-  --grid-margin: 2.7vw; /* 50px at 1920px */
+  --grid-col-1: 16.7fr;
+  --grid-col-2: 9.73fr;
+  --grid-col-3: 38.85fr;
+  --grid-col-4: 34.73fr;
+  --grid-margin: 4.1667rem;
   --grid-gap: 0px; /* Ajustez si nécessaire */
 
   /* Mobile Grid */
-  --grid-col-mobile-1: 20%;
-  --grid-col-mobile-2: 40%;
-  --grid-col-mobile-3: 40%;
+  --grid-col-mobile-1: 20fr;
+  --grid-col-mobile-2: 40fr;
+  --grid-col-mobile-3: 40fr;
 
   --font-inter: "Inter Tight", sans-serif;
   --font-cormorant: "Cormorant Garamond", serif;
+}
+
+.align-end {
+  align-self: flex-end;
 }
 
 .font-como {
@@ -144,13 +141,6 @@ a {
 .container,
 .container-grid {
   margin-inline: var(--gutter-x);
-}
-
-.grid {
-  display: grid;
-  grid-template-columns: repeat(var(--columns), 1fr);
-  grid-template-rows: repeat(var(--rows), 1fr);
-  gap: var(--grid-gap);
 }
 
 /* 
@@ -463,6 +453,12 @@ html {
     letter-spacing: -0.05em; /* Retour à -5% sur desktop */
   }
 
+  .t1-h3-accent,
+  .type-1 .h3-accent {
+    font-size: 15.6rem; /* 156px desktop */
+    line-height: 0.91; /* 100/110 */
+  }
+
   .t1-h4,
   .type-1 h4 {
     font-size: 6.6rem; /* 66px desktop */
@@ -480,6 +476,10 @@ html {
   .type-1 .body {
     font-size: 1.8rem; /* 18px desktop */
     line-height: 1.21; /* 21.8/18 */
+  }
+
+  .uppercase {
+    text-transform: uppercase;
   }
 }
 

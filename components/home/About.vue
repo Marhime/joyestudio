@@ -2,12 +2,12 @@
   <section ref="sectionRef" class="about">
     <div class="grid-container">
       <div class="about__title">
-        <p class="t2-body-accent font-como font-italic">
+        <h2 class="t2-body-accent font-como font-italic">
           <span>( Our</span><span class="align-end">approach )</span>
-        </p>
+        </h2>
       </div>
       <div class="about__wrapper">
-        <h2 class="about__content t1-h2">
+        <h3 class="about__content t1-h2">
           <span class="about__content-line about__content-line--1">
             <span>At </span>
             <span class="font-italic font-como t2-h2">Joyestudio, </span>
@@ -21,17 +21,14 @@
             ><span hiye-face-placeholder class="face-placeholder"></span
             ><span>a digital</span>
           </span>
-          <span class="icon"
-            ><img src="~/assets/images/icons/right-arrow.svg" /></span
+          <span class="icon"><IconRightArrow /></span
           ><span class="about__content-line--4">presence that feels</span>
           <span
             class="about__content-line about__content-line--5 font-italic font-como t2-h2"
-            ><span class="icon-mobile"
-              ><img src="~/assets/images/icons/right-arrow.svg"
-            /></span>
+            ><span class="icon-mobile"><IconRightArrow /></span>
             <span>as good as it looks</span></span
           >
-        </h2>
+        </h3>
       </div>
       <div class="text-container">
         <div class="text-wrapper">
@@ -45,6 +42,7 @@
         </div>
       </div>
     </div>
+    <LayoutLines color="black" />
   </section>
 </template>
 
@@ -52,7 +50,9 @@
 const { $gsap, $Flip } = useNuxtApp();
 
 const sectionRef = ref(null);
-const buttonWrapperRef = ref(null);
+
+// Sphère 3D fournie par le layout default via provide/inject
+const pixelBlob = inject("pixelBlob");
 
 let ctx;
 
@@ -82,6 +82,7 @@ onMounted(() => {
           start: "top bottom",
           end: "top top",
           scrub: 1,
+          invalidateOnRefresh: true,
         },
       });
 
@@ -98,6 +99,7 @@ onMounted(() => {
           start: "40% bottom",
           end: "70% bottom",
           scrub: 1,
+          invalidateOnRefresh: true,
           // markers: true,
         },
       });
@@ -115,10 +117,20 @@ onMounted(() => {
 
   nextTick(() => {
     createFlipAnimation();
+
+    // Tracking temps réel — la sphère 3D suit l'élément hiye-face
+    // pixel-perfect via gsap.ticker (appelé depuis l'anim GSAP)
+    const hiyeFaceEl = document.querySelector("[hiye-face]");
+    if (hiyeFaceEl) {
+      pixelBlob?.value?.startTracking(hiyeFaceEl);
+    }
   });
 
   window.addEventListener("resize", () => {
     debouncedCreateFlipAnimation();
+    // Re-démarre le tracking après recalcul layout (relit le bon rect)
+    const hiyeFaceEl = document.querySelector("[hiye-face]");
+    if (hiyeFaceEl) pixelBlob?.value?.startTracking(hiyeFaceEl);
   });
 });
 
@@ -130,9 +142,9 @@ onUnmounted(() => {
 <style lang="scss" scoped>
 .about {
   position: relative;
-  z-index: 1;
   padding-top: 10rem;
   padding-bottom: 6.6rem;
+  z-index: 0;
   @include respond-to("desktop") {
     padding-top: 30rem;
   }
@@ -147,7 +159,7 @@ onUnmounted(() => {
 
     .icon {
       display: none;
-      img {
+      svg {
         width: 100%;
         height: auto;
         display: block;
@@ -162,11 +174,6 @@ onUnmounted(() => {
       }
     }
   }
-
-  .grid-container {
-    position: relative;
-  }
-
   &__title {
     text-transform: uppercase;
     @include grid;
@@ -178,9 +185,6 @@ onUnmounted(() => {
       grid-column-start: 2;
       line-height: 1;
       width: 40%;
-    }
-    .align-end {
-      align-self: flex-end;
     }
 
     @include respond-to("desktop") {

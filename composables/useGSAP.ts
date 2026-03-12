@@ -2,7 +2,7 @@ import type { WatchSource } from "vue";
 
 export function useGSAP(
   callback: (isReducedMotion: boolean) => void,
-  watchSource?: WatchSource
+  watchSource?: WatchSource,
 ): () => void {
   const { $gsap, $ScrollTrigger } = useNuxtApp();
   let ctx: gsap.Context | undefined;
@@ -13,7 +13,7 @@ export function useGSAP(
       ctx = $gsap.context(() => {
         callback(
           window?.matchMedia("(prefers-reduced-motion: reduce)").matches ??
-            false
+            false,
         );
 
         $ScrollTrigger.refresh();

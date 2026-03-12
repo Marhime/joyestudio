@@ -96,17 +96,17 @@ h6 {
   --color-grey: #c5cdcf;
 
   /* Desktop Grid */
-  --grid-col-1: 16.7%;
-  --grid-col-2: 9.73%;
-  --grid-col-3: 38.85%;
-  --grid-col-4: 34.73%;
+  --grid-col-1: 16.7fr;
+  --grid-col-2: 9.73fr;
+  --grid-col-3: 38.85fr;
+  --grid-col-4: 34.73fr;
   --grid-margin: 50px;
   --grid-gap: 0px; /* Ajustez si nécessaire */
 
   /* Mobile Grid */
-  --grid-col-mobile-1: 20%;
-  --grid-col-mobile-2: 40%;
-  --grid-col-mobile-3: 40%;
+  --grid-col-mobile-1: 20fr;
+  --grid-col-mobile-2: 40fr;
+  --grid-col-mobile-3: 40fr;
 
   --font-inter: "Inter Tight", sans-serif;
   --font-cormorant: "Cormorant Garamond", serif;

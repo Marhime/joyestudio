@@ -2,11 +2,17 @@
   <Hero />
   <About />
   <Services />
+  <OurProjects />
+  <OurTeam />
+  <Contact />
 </template>
 
 <script lang="ts" setup>
 import About from "~/components/home/About.vue";
+import Contact from "~/components/home/Contact.vue";
 import Hero from "~/components/home/Hero.vue";
+import OurProjects from "~/components/home/OurProjects.vue";
+import OurTeam from "~/components/home/OurTeam.vue";
 import Services from "~/components/home/Services.vue";
 </script>
 

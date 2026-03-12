@@ -76,6 +76,15 @@
 
       <span class="button__label" :data-label="labelSecondary">
         <span class="button__label-inner">{{ label }}</span>
+        <span class="button__label-secondary">
+          {{ labelSecondary }}
+          <NuxtImg
+            src="/images/hand-emoji.gif"
+            alt="Hand Emoji"
+            width="20"
+            height="20"
+          />
+        </span>
       </span>
     </NuxtLink>
   </div>
@@ -136,6 +145,11 @@ defineProps(["href", "label", "labelSecondary", "target"]);
   text-decoration: none;
   font-family: var(--font-inter);
 
+  --button-icon: var(--color-blue);
+  --button-bg: var(--color-white);
+  --button-text: var(--color-white);
+  --grid-color: var(--color-white);
+
   @include respond-to("desktop") {
     padding: 24.5px 0 24.5px 24.5px;
     gap: 67.5px;
@@ -158,14 +172,14 @@ defineProps(["href", "label", "labelSecondary", "target"]);
   padding-right: 81px;
 
   &-inner {
-    display: block;
+    display: flex;
+    align-items: center;
     will-change: transform;
     transition: transform var(--ease-button);
   }
 
-  &::after {
+  &-secondary {
     will-change: transform;
-    content: attr(data-label);
     position: absolute;
     top: 0;
     left: 0;
@@ -173,6 +187,13 @@ defineProps(["href", "label", "labelSecondary", "target"]);
     transition: transform var(--ease-button);
     color: var(--button-icon);
     word-break: keep-all;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+  img {
+    display: block;
+    width: 26px;
   }
 }
 
@@ -201,7 +222,7 @@ defineProps(["href", "label", "labelSecondary", "target"]);
     transform: translateY(-120%);
   }
 
-  .button__label::after {
+  .button__label-secondary {
     transform: translateY(0);
   }
 }

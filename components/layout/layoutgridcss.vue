@@ -17,12 +17,10 @@
           />
         </div>
       </div>
+      <LayoutLines color="white" />
     </div>
 
     <!-- Ligne verticale en absolute -->
-    <div ref="verticalLine" class="vertical-line" />
-    <div ref="verticalLine1" class="vertical-line" />
-    <div ref="verticalLine2" class="vertical-line" />
   </div>
 </template>
 
@@ -38,9 +36,6 @@ const {
 } = useLogoFlip();
 
 const gridContainer = ref(null);
-const verticalLine = ref(null);
-const verticalLine1 = ref(null);
-const verticalLine2 = ref(null);
 const squareRefs = ref([]);
 const totalSquares = ref(0);
 const currentCols = ref(11);
@@ -64,7 +59,8 @@ const calculateGridSize = () => {
   currentCols.value = cols;
 
   // Calculate square size (perfect squares)
-  const squareSize = w / cols;
+  // Use Math.ceil to avoid subpixel gaps on mobile
+  const squareSize = Math.ceil(w / cols);
 
   // Calculate rows needed to fill height (+ 1 row buffer)
   const rows = Math.ceil(h / squareSize) + 1;
@@ -78,26 +74,6 @@ const calculateGridSize = () => {
     gridTemplateColumns: `repeat(${cols}, 1fr)`,
     gridAutoRows: `${squareSize}px`,
   });
-
-  // Position vertical line at column 4 (right edge of column 3)
-  if (verticalLine.value) {
-    const linePosition = squareSize * 2; // After 3 columns
-    $gsap.set(verticalLine.value, {
-      left: `${linePosition}px`,
-    });
-  }
-  if (verticalLine1.value) {
-    const linePosition = squareSize * 3; // After 6 columns
-    $gsap.set(verticalLine1.value, {
-      left: `${linePosition}px`,
-    });
-  }
-  if (verticalLine2.value) {
-    const linePosition = squareSize * 7; // After 9 columns
-    $gsap.set(verticalLine2.value, {
-      left: `${linePosition}px`,
-    });
-  }
 
   console.log({
     viewport: { width: w, height: h },
@@ -115,7 +91,6 @@ const calculateGridSize = () => {
 const setupEventListeners = () => {
   // squareRefs.value.forEach((square) => {
   //   if (!square) return;
-
   //   square.addEventListener("click", () => {
   //     square.classList.add("clicked");
   //     $gsap.to(square, {
@@ -124,17 +99,17 @@ const setupEventListeners = () => {
   //     });
   //   });
   // });
-  const innerSquares = document.querySelectorAll(".inner-square");
-  innerSquares.forEach((inner) => {
-    inner.addEventListener("click", (e) => {
-      e.stopPropagation(); // Prevent click from bubbling to parent square
-      inner.classList.add("clicked");
-      $gsap.to(inner, {
-        backgroundColor: "var(--color-white)",
-        duration: 0.5,
-      });
-    });
-  });
+  // const innerSquares = document.querySelectorAll(".inner-square");
+  // innerSquares.forEach((inner) => {
+  //   inner.addEventListener("click", (e) => {
+  //     e.stopPropagation(); // Prevent click from bubbling to parent square
+  //     inner.classList.add("clicked");
+  //     $gsap.to(inner, {
+  //       backgroundColor: "var(--color-white)",
+  //       duration: 0.5,
+  //     });
+  //   });
+  // });
 };
 
 // get first row of squares
@@ -172,9 +147,9 @@ const getAllSquaresWithoutSome = (excludeIndices) => {
 
 // animation keyframes
 const animateChangeColor = () => {
-  const root = document.documentElement;
   const firstRow = getRows([0]);
-  const firstAndSecondRow = getRows([0, 1]);
+  const layoutLines =
+    gridContainer.value.querySelectorAll(".layout-lines__col");
 
   const menuSquares = firstRow[0][0]; // First 8 squares of the first two rows (menu area)
 
@@ -192,14 +167,6 @@ const animateChangeColor = () => {
     logoAndButtonSquares.map((sq) => squareRefs.value.indexOf(sq)),
   );
 
-  console.log("Animating squares:", {
-    firstRow,
-    firstRowLength: firstRow[0].length,
-    firstAndSecondRow,
-    logoSquares,
-    allExceptLogoAndButtonSquares,
-  });
-
   // Prépare les logos hero en position fixe et capture la destination (header)
   setInitialPositions();
 
@@ -208,8 +175,9 @@ const animateChangeColor = () => {
       trigger: gridContainer.value,
       start: "top top",
       end: "50% top",
-      scrub: true,
-      markers: true,
+      scrub: 1,
+      invalidateOnRefresh: true,
+      // markers: true,
     },
     defaults: { ease: "power1.inOut" },
   });
@@ -218,20 +186,28 @@ const animateChangeColor = () => {
   addFlipToTimeline(tl, 0);
 
   tl.to(allExceptLogoAndButtonSquares, {
-    backgroundColor: "var(--color-white)",
+    autoAlpha: 0,
     duration: 0.5,
     stagger: {
       from: "random",
       amount: 1.5,
     },
   })
+    // .to(
+    //   layoutLines,
+    //   {
+    //     autoAlpha: 0,
+    //     duration: 0.5,
+    //   },
+    //   "<",
+    // )
     .to(
       menuSquares,
       {
-        backgroundColor: "var(--color-white)",
+        autoAlpha: 0,
         duration: 0.5,
       },
-      1.5,
+      2,
     )
 
     .to(
@@ -246,7 +222,7 @@ const animateChangeColor = () => {
     .to(
       logoSquares,
       {
-        backgroundColor: "var(--color-white)",
+        autoAlpha: 0,
         duration: 0.5,
         stagger: {
           from: "center",
@@ -268,7 +244,7 @@ const animateChangeColor = () => {
     .to(
       buttonSquares,
       {
-        backgroundColor: "var(--color-white)",
+        autoAlpha: 0,
         duration: 0.5,
       },
       "<",
@@ -288,7 +264,7 @@ const animateChangeColor = () => {
       "<",
     )
     .to(
-      ".header .button__icon",
+      [".header .button__icon", ".header .button__label-secondary"],
       {
         color: "var(--color-white)",
       },
@@ -321,6 +297,7 @@ watch(totalSquares, async () => {
 });
 
 onMounted(() => {
+  window.scrollTo(0, 0); // Assure que la page démarre en haut
   calculateGridSize();
   window.addEventListener("resize", handleResize);
 });
@@ -343,6 +320,9 @@ defineExpose({
   left: 0;
   width: 100vw;
   min-height: 100vh;
+  /* background-color: var(--color-blue); */
+  overflow: hidden;
+  pointer-events: none;
 }
 
 .artistic-grid {
@@ -366,7 +346,7 @@ defineExpose({
   top: 0;
   height: 100%;
   width: 1px;
-  background-color: rgb(249, 249, 249, 0.5);
+  background-color: var(--color-white);
   /* background-color: rgba(197, 205, 207, 0.5); */
   pointer-events: none;
   z-index: 10;

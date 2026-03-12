@@ -30,7 +30,6 @@
     var(--grid-col-mobile-2)
     var(--grid-col-mobile-3);
   gap: var(--grid-gap);
-  width: 100%;
 
   @include respond-to("desktop") {
     grid-template-columns:

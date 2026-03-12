@@ -3,20 +3,26 @@
   <div class="page-container">
     <Header theme="dark" />
     <!-- Contenu principal -->
-    <div class="main-content">
-      <main>
-        <slot />
-      </main>
-    </div>
-    <LayoutGridCss />
+    <main class="main-content">
+      <slot />
+    </main>
+    <!-- <LayoutGridCss /> -->
+    <!-- Sphère 3D — overlay fixe, commun à toutes les pages -->
+    <!-- <PixelBlob3 ref="pixelBlobRef" /> -->
+    <Footer />
   </div>
 </template>
 
 <script lang="ts" setup>
-import { ref, onMounted, onUnmounted } from "vue";
+import { ref, provide, onMounted, onUnmounted } from "vue";
+import Footer from "~/components/layout/Footer.vue";
 import Header from "~/components/layout/Header.vue";
 
 const showGrid = ref(false);
+const pixelBlobRef = ref(null);
+
+// Rend la sphère accessible depuis n'importe quel composant enfant
+provide("pixelBlob", pixelBlobRef);
 
 const toggleGrid = (e: KeyboardEvent) => {
   if (e.key === "g" || e.key === "G") {
@@ -39,16 +45,7 @@ onUnmounted(() => {
   width: 100vw;
   position: relative;
   z-index: 10;
-}
-
-footer {
-  width: 100%;
-  height: 100vh;
-}
-
-section {
-  width: 100%;
-  height: 200vh;
+  background-color: var(--color-white);
 }
 
 .vertical-bar-center {
