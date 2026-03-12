@@ -26,8 +26,14 @@
 
 <script setup>
 import { debounce } from "~/utils/debounce";
+import { useGSAP } from "~/composables/useGSAP";
 
-const { $gsap } = useNuxtApp();
+// ── GSAP ──────────────────────────────────────────────────────────────────────
+// mm     : one matchMedia instance per component, auto-reverts on unmount
+// BP     : breakpoint strings aligned with _mixins.scss
+// scheduleRefresh : debounced ScrollTrigger.refresh() shared across all components
+const { gsap, mm, BP, scheduleRefresh } = useGSAP();
+
 const {
   init: initFlip,
   setInitialPositions,
@@ -40,10 +46,10 @@ const squareRefs = ref([]);
 const totalSquares = ref(0);
 const currentCols = ref(11);
 
-// Configuration responsive
+// Configuration responsive — align MOBILE_BREAKPOINT with BP.desktop (901px)
 const DESKTOP_COLS = 11;
 const MOBILE_COLS = 6;
-const MOBILE_BREAKPOINT = 768;
+const MOBILE_BREAKPOINT = 901;
 
 /**
  * Calculate how many squares needed to fill viewport
@@ -70,7 +76,7 @@ const calculateGridSize = () => {
   totalSquares.value = total;
 
   // Apply grid configuration with GSAP for smooth transitions
-  $gsap.set(gridContainer.value, {
+  gsap.set(gridContainer.value, {
     gridTemplateColumns: `repeat(${cols}, 1fr)`,
     gridAutoRows: `${squareSize}px`,
   });
@@ -146,139 +152,151 @@ const getAllSquaresWithoutSome = (excludeIndices) => {
 };
 
 // animation keyframes
-const animateChangeColor = () => {
-  const firstRow = getRows([0]);
-  const layoutLines =
-    gridContainer.value.querySelectorAll(".layout-lines__col");
+const setupAnimations = () => {
+  if (!gridContainer.value) return;
 
-  const menuSquares = firstRow[0][0]; // First 8 squares of the first two rows (menu area)
+  // ── Reset previous state ───────────────────────────────────────────────────
+  // mm.revert() kills all previously enrolled ScrollTriggers + tweens from this
+  // component, then re-registers fresh mm.add() conditions below.
+  // Critical on grid resize: old triggers reference stale DOM nodes.
+  mm.revert();
 
-  const logoSquares = [firstRow[0][5]]; // Just the squares behind the logo (columns 4-7 of the first row)
+  // Shared ScrollTrigger config — same scroll window for both breakpoints.
+  // invalidateOnRefresh recalculates start/end after scheduleRefresh().
+  const stConfig = {
+    trigger: gridContainer.value,
+    start: "top top",
+    end: "50% top",
+    scrub: 1,
+    invalidateOnRefresh: true,
+  };
 
-  const buttonSquares = [
-    firstRow[0][firstRow[0].length - 1], // Last column of the first row
-    firstRow[0][firstRow[0].length - 2],
-    firstRow[0][firstRow[0].length - 3],
-  ]; // First 4 columns of the first two rows
+  // ── Desktop: logo Flip + targeted pixel fade + header color transitions ────
+  // Element selection happens INSIDE mm.add so indices use the correct col count
+  // (11 cols) regardless of when the callback fires after a resize.
+  // mm.add auto-reverts ALL gsap state created inside when leaving BP.desktop.
+  mm.add(BP.desktop, () => {
+    const firstRow = getRows([0]);
+    const row = firstRow[0];
 
-  const logoAndButtonSquares = [...logoSquares, ...buttonSquares];
+    // Desktop grid layout (11 cols):
+    //   col 0         → menu / nav area square
+    //   col 5         → square behind the hero logo
+    //   cols 8, 9, 10 → squares behind the header CTA button
+    const menuSquare = row[0];
+    const logoSquares = [row[5]];
+    const buttonSquares = [
+      row[row.length - 1],
+      row[row.length - 2],
+      row[row.length - 3],
+    ];
+    const specialSquares = [...logoSquares, ...buttonSquares];
+    const allExceptSpecial = getAllSquaresWithoutSome(
+      specialSquares.map((sq) => squareRefs.value.indexOf(sq)),
+    );
 
-  const allExceptLogoAndButtonSquares = getAllSquaresWithoutSome(
-    logoAndButtonSquares.map((sq) => squareRefs.value.indexOf(sq)),
-  );
+    // setInitialPositions captured here so Flip reads fresh viewport coordinates
+    // after any resize recalculation.
+    setInitialPositions();
 
-  // Prépare les logos hero en position fixe et capture la destination (header)
-  setInitialPositions();
+    const tl = gsap.timeline({
+      scrollTrigger: stConfig,
+      defaults: { ease: "power1.inOut" },
+    });
 
-  const tl = $gsap.timeline({
-    scrollTrigger: {
-      trigger: gridContainer.value,
-      start: "top top",
-      end: "50% top",
-      scrub: 1,
-      invalidateOnRefresh: true,
-      // markers: true,
-    },
-    defaults: { ease: "power1.inOut" },
+    // Logo Flip kicks off at t=0 in sync with the first pixel batch
+    addFlipToTimeline(tl, 0);
+
+    tl
+      // 1. All non-special squares dissolve with random stagger
+      .to(allExceptSpecial, {
+        autoAlpha: 0,
+        duration: 0.5,
+        stagger: { from: "random", amount: 1.5 },
+      })
+      // 2. Menu square fades last (delayed to t=2 so nav stays visible longer)
+      .to(menuSquare, { autoAlpha: 0, duration: 0.5 }, 2)
+      // 3. Hero CTA button wrapper fades with the menu square
+      .to(".button-wrapper", { autoAlpha: 0, duration: 0.5 }, "<")
+      // 4. Logo squares behind hero fade from center outward
+      .to(
+        logoSquares,
+        {
+          autoAlpha: 0,
+          duration: 0.5,
+          stagger: { from: "center", amount: 1.5 },
+        },
+        "<",
+      )
+      // 5. Hero logo SVGs transition to black (destination color in header)
+      .to(
+        ["[hero-logo-left]", "[hero-logo-right]"],
+        {
+          color: "var(--color-black)",
+          duration: 0.5,
+        },
+        "<",
+      )
+      // 6. Button area squares dissolve
+      .to(buttonSquares, { autoAlpha: 0, duration: 0.5 }, "<")
+      // 7. Header button styles transition into their final state
+      .to(".header .button__bg", { backgroundColor: "var(--color-blue)" }, "<")
+      .to(".header .button__label", { color: "var(--color-blue)" }, "<")
+      .to(
+        [".header .button__icon", ".header .button__label-secondary"],
+        { color: "var(--color-white)" },
+        "<",
+      )
+      // 8. Header logo SVGs become black
+      .to(
+        ["[header-logo-left]", "[header-logo-right]"],
+        {
+          color: "var(--color-black)",
+          duration: 0.5,
+        },
+        "<",
+      );
+
+    // Return fn: add non-GSAP cleanup here (event listeners, Three.js, etc.)
+    return () => {};
   });
 
-  // Logo flip : démarre en même temps que allExceptLogoAndButtonSquares
-  addFlipToTimeline(tl, 0);
+  // ── Mobile: full pixel dissolve — no Flip, no header coupling ─────────────
+  // On mobile the header is a separate overlay and the button-wrapper sits
+  // inline in the hero flow, not positioned over the grid. We dissolve all
+  // squares uniformly — no per-zone targeting needed.
+  mm.add(BP.mobile, () => {
+    const firstRow = getRows([0]);
+    const row = firstRow[0];
 
-  tl.to(allExceptLogoAndButtonSquares, {
-    autoAlpha: 0,
-    duration: 0.5,
-    stagger: {
-      from: "random",
-      amount: 1.5,
-    },
-  })
-    // .to(
-    //   layoutLines,
-    //   {
-    //     autoAlpha: 0,
-    //     duration: 0.5,
-    //   },
-    //   "<",
-    // )
-    .to(
-      menuSquares,
-      {
-        autoAlpha: 0,
-        duration: 0.5,
-      },
-      2,
-    )
-
-    .to(
-      ".button-wrapper",
-      {
-        autoAlpha: 0,
-        duration: 0.5,
-      },
-      "<",
-    )
-
-    .to(
-      logoSquares,
-      {
-        autoAlpha: 0,
-        duration: 0.5,
-        stagger: {
-          from: "center",
-          amount: 1.5,
-        },
-      },
-      "<",
-    )
-
-    .to(
-      ["[hero-logo-left]", "[hero-logo-right]"],
-      {
-        color: "var(--color-black)",
-        duration: 0.5,
-      },
-      "<",
-    )
-
-    .to(
-      buttonSquares,
-      {
-        autoAlpha: 0,
-        duration: 0.5,
-      },
-      "<",
-    )
-    .to(
-      ".header .button__bg",
-      {
-        backgroundColor: "var(--color-blue)",
-      },
-      "<",
-    )
-    .to(
-      ".header .button__label",
-      {
-        color: "var(--color-blue)",
-      },
-      "<",
-    )
-    .to(
-      [".header .button__icon", ".header .button__label-secondary"],
-      {
-        color: "var(--color-white)",
-      },
-      "<",
-    )
-
-    .to(
-      ["[header-logo-left]", "[header-logo-right]"],
-      {
-        color: "var(--color-black)",
-        duration: 0.5,
-      },
-      "<",
+    // Mobile grid layout (6 cols):
+    //   All squares dissolve at the same rate — no designated menu/button zones.
+    //   Logo squares fade slightly later to keep orientation visible longer.
+    const logoSquares = [row[Math.floor(row.length / 2)]]; // center col
+    const allOtherSquares = getAllSquaresWithoutSome(
+      logoSquares.map((sq) => squareRefs.value.indexOf(sq)),
     );
+
+    const tl = gsap.timeline({
+      scrollTrigger: stConfig,
+      defaults: { ease: "power1.inOut" },
+    });
+
+    tl
+      // 1. All non-logo squares dissolve with random stagger
+      .to(allOtherSquares, {
+        autoAlpha: 0,
+        duration: 0.5,
+        stagger: { from: "random", amount: 1.8 },
+      })
+      // 2. Center logo square fades last
+      .to(logoSquares, { autoAlpha: 0, duration: 0.5 }, "-=0.2");
+
+    return () => {};
+  });
+
+  // Single debounced refresh — collapses with calls from Hero, Services, etc.
+  scheduleRefresh();
 };
 
 // Debounced resize handler
@@ -293,7 +311,7 @@ watch(totalSquares, async () => {
   await nextTick(); // Wait for DOM to update
   setupEventListeners();
   initFlip(); // Sélectionne les éléments logo dans le DOM
-  animateChangeColor();
+  setupAnimations();
 });
 
 onMounted(() => {
@@ -304,6 +322,7 @@ onMounted(() => {
 
 onUnmounted(() => {
   window.removeEventListener("resize", handleResize);
+  // mm.revert() is handled automatically by useGSAP's onUnmounted
 });
 
 // Expose refs for animations
