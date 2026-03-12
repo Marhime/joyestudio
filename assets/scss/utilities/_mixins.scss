@@ -25,18 +25,13 @@
 
 @mixin grid {
   display: grid;
-  grid-template-columns:
-    var(--grid-col-mobile-1)
-    var(--grid-col-mobile-2)
-    var(--grid-col-mobile-3);
+  // Mobile : 6 colonnes égales = MOBILE_COLS
+  grid-template-columns: repeat(6, 1fr);
   gap: var(--grid-gap);
 
+  // Desktop : 11 colonnes égales = DESKTOP_COLS (aligné pixel-perfect avec LayoutGridCss)
   @include respond-to("desktop") {
-    grid-template-columns:
-      var(--grid-col-1)
-      var(--grid-col-2)
-      var(--grid-col-3)
-      var(--grid-col-4);
+    grid-template-columns: repeat(11, 1fr);
   }
 }
 

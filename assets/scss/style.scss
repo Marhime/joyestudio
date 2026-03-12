@@ -107,19 +107,14 @@ a {
 
   --ease-button: 0.5s cubic-bezier(0.19, 1, 0.22, 1);
 
-  /* Desktop Grid */
-  --grid-col-1: 16.7fr;
-  --grid-col-2: 9.73fr;
-  --grid-col-3: 38.85fr;
-  --grid-col-4: 34.73fr;
-  --grid-margin: 4.1667rem;
-  --grid-gap: 0px; /* Ajustez si nécessaire */
+  /* Grid système — identique au pixel grid LayoutGridCss
+     Desktop : 11 colonnes égales (repeat(11, 1fr))
+     Mobile  : 6 colonnes égales (repeat(6, 1fr))
+     Aucun padding sur les containers — les colonnes CSS = colonnes pixel */
+  --grid-gap: 0px;
 
-  /* Mobile Grid */
-  --grid-col-mobile-1: 20fr;
-  --grid-col-mobile-2: 40fr;
-  --grid-col-mobile-3: 40fr;
-
+  /* Margin de contenu utilitaire (1 colonne pixel) */
+  --content-margin: 2.667vw;
   --font-inter: "Inter Tight", sans-serif;
   --font-cormorant: "Cormorant Garamond", serif;
 }
@@ -167,10 +162,10 @@ a {
   Grid System
 */
 
-/* Container principal */
+/* Container principal — full width, zéro padding
+   Les colonnes CSS = colonnes pixel, alignement pixel-perfect garanti */
 .grid-container {
   width: 100%;
-  padding: 0 var(--grid-margin);
   box-sizing: border-box;
 }
 
@@ -179,7 +174,8 @@ a {
   @include grid;
 }
 
-/* Classes utilitaires pour spans de colonnes - Desktop */
+/* Classes utilitaires — système 11 colonnes
+   Pixel boundaries: | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | */
 .col-span-1 {
   grid-column: span 1;
 }
@@ -192,8 +188,28 @@ a {
 .col-span-4 {
   grid-column: span 4;
 }
+.col-span-5 {
+  grid-column: span 5;
+}
+.col-span-6 {
+  grid-column: span 6;
+}
+.col-span-7 {
+  grid-column: span 7;
+}
+.col-span-8 {
+  grid-column: span 8;
+}
+.col-span-9 {
+  grid-column: span 9;
+}
+.col-span-10 {
+  grid-column: span 10;
+}
+.col-span-11 {
+  grid-column: span 11;
+}
 
-/* Classes pour démarrer à une colonne spécifique - Desktop */
 .col-start-1 {
   grid-column-start: 1;
 }
@@ -206,8 +222,19 @@ a {
 .col-start-4 {
   grid-column-start: 4;
 }
+.col-start-5 {
+  grid-column-start: 5;
+}
+.col-start-6 {
+  grid-column-start: 6;
+}
+.col-start-7 {
+  grid-column-start: 7;
+}
+.col-start-8 {
+  grid-column-start: 8;
+}
 
-/* Classes pour finir à une colonne spécifique - Desktop */
 .col-end-2 {
   grid-column-end: 2;
 }
@@ -220,20 +247,24 @@ a {
 .col-end-5 {
   grid-column-end: 5;
 }
+.col-end-6 {
+  grid-column-end: 6;
+}
+.col-end-7 {
+  grid-column-end: 7;
+}
+.col-end-8 {
+  grid-column-end: 8;
+}
+.col-end-9 {
+  grid-column-end: 9;
+}
+.col-end-12 {
+  grid-column-end: 12;
+}
 
-/* Grid Mobile */
+/* Grid Mobile — géré directement dans le @mixin grid via respond-to("desktop") */
 @media (max-width: 768px) {
-  :root {
-    --grid-margin: 20px; /* Marges réduites sur mobile */
-  }
-
-  .grid {
-    grid-template-columns:
-      var(--grid-col-mobile-1)
-      var(--grid-col-mobile-2)
-      var(--grid-col-mobile-3);
-  }
-
   /* Classes utilitaires pour spans de colonnes - Mobile */
   .col-span-1,
   .col-span-2,
@@ -284,17 +315,12 @@ a {
   bottom: 0;
   pointer-events: none;
   z-index: 0;
-  padding: 0 var(--grid-margin);
 }
 
 .grid-overlay-inner {
   height: 100%;
   display: grid;
-  grid-template-columns:
-    var(--grid-col-1)
-    var(--grid-col-2)
-    var(--grid-col-3)
-    var(--grid-col-4);
+  grid-template-columns: repeat(11, 1fr);
   gap: var(--grid-gap);
 }
 
@@ -326,10 +352,7 @@ a {
 
 @media (max-width: 768px) {
   .grid-overlay-inner {
-    grid-template-columns:
-      var(--grid-col-mobile-1)
-      var(--grid-col-mobile-2)
-      var(--grid-col-mobile-3);
+    grid-template-columns: repeat(6, 1fr);
   }
 }
 

@@ -1,10 +1,7 @@
 <template>
   <Hero />
   <About />
-  <Services />
-  <OurProjects />
-  <OurTeam />
-  <Contact />
+  <div class="placeholder"></div>
 </template>
 
 <script lang="ts" setup>
@@ -16,4 +13,10 @@ import OurTeam from "~/components/home/OurTeam.vue";
 import Services from "~/components/home/Services.vue";
 </script>
 
-<style></style>
+<style>
+.placeholder {
+  width: 100%;
+  height: 100vh;
+  background-color: #f0f0f0;
+}
+</style>

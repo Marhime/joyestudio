@@ -163,6 +163,7 @@ onUnmounted(() => {
         width: 100%;
         height: auto;
         display: block;
+        color: var(--color-black);
       }
       @include respond-to("desktop") {
         color: black;
@@ -191,7 +192,7 @@ onUnmounted(() => {
       display: block;
       position: absolute;
       top: 0;
-      left: var(--grid-margin);
+      left: var(--content-margin);
       width: 18%;
       margin-bottom: 0;
     }
@@ -243,31 +244,31 @@ onUnmounted(() => {
     @include respond-to("desktop") {
       &-line {
         &--1 {
-          grid-column-start: 3;
-          grid-column-end: 5;
+          grid-column-start: 4;
+          grid-column-end: 11;
         }
         &--2 {
-          grid-column-start: 2;
-          grid-column-end: 5;
+          grid-column-start: 3;
+          grid-column-end: 11;
 
           margin-left: -0.6rem;
         }
         &--3 {
-          grid-column-start: 2;
-          grid-column-end: 5;
+          grid-column-start: 3;
+          grid-column-end: 11;
           display: flex;
           gap: 4.5rem;
 
           margin-left: -0.3rem;
         }
         &--4 {
-          grid-column-start: 3;
-          grid-column-end: 5;
+          grid-column-start: 4;
+          grid-column-end: 11;
           margin-left: -0.6rem;
         }
         &--5 {
           grid-column-start: 3;
-          grid-column-end: 5;
+          grid-column-end: 11;
           margin-left: -0.3rem;
           display: block;
           .icon-mobile {
@@ -298,8 +299,8 @@ onUnmounted(() => {
     @include respond-to("desktop") {
       margin-top: 16.5rem;
       .text-wrapper {
-        grid-column-start: 3;
-        grid-column-end: 4;
+        grid-column-start: 4;
+        grid-column-end: 8;
         p {
           font-size: 2.4rem;
         }

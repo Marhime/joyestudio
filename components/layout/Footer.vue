@@ -11,7 +11,6 @@
             >contact@joyestud.io</a
           >
         </div>
-        <div class="second-column pixel"></div>
         <div class="third-column">
           <div class="links">
             <div class="title">Explore</div>
@@ -55,6 +54,7 @@ import LogoFull from "../icons/LogoFull.vue";
 
 <style lang="scss" scoped>
 footer {
+  display: none;
   .title {
     font-size: 1.2rem;
     color: var(--color-pink);

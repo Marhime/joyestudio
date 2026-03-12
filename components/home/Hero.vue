@@ -2,13 +2,13 @@
   <section data-theme="dark" ref="sectionRef" class="hero-section">
     <div class="grid-container">
       <div class="home-logo">
-        <div class="hero-content">
+        <div ref="heroContentRef" class="hero-content">
           <h1 class="t1-body">
             <span>We create things people love to use</span> - and businesses
             love to own
           </h1>
         </div>
-        <div hiye-face class="hiye">
+        <div hiye-face ref="hiyeRef" class="hiye">
           <img
             class="hife--face"
             src="~/assets/images/HiYe2.png"
@@ -156,8 +156,120 @@
   </section>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import ButtonComponent from "../layout/ButtonComponent.vue";
+import { useGSAP } from "~/composables/useGSAP";
+
+// ── Refs ────────────────────────────────────────────────────────────────────
+const logoLeftRef = useTemplateRef<SVGSVGElement>("logoLeftRef");
+const logoRightRef = useTemplateRef<SVGSVGElement>("logoRightRef");
+const hiyeRef = useTemplateRef<HTMLDivElement>("hiyeRef");
+const heroContentRef = useTemplateRef<HTMLDivElement>("heroContentRef");
+const buttonWrapperRef = useTemplateRef<HTMLDivElement>("buttonWrapperRef");
+
+// ── GSAP ─────────────────────────────────────────────────────────────────────
+const { gsap, mm, BP, scheduleRefresh } = useGSAP();
+
+onMounted(() => {
+  nextTick(() => {
+    // ── Desktop ─────────────────────────────────────────────────────────────
+    // mm.add auto-reverts everything inside when leaving the breakpoint.
+    mm.add(BP.desktop, () => {
+      // Set initial states before the page paints
+      gsap.set(logoLeftRef.value, { autoAlpha: 0, xPercent: -12 });
+      gsap.set(logoRightRef.value, { autoAlpha: 0, xPercent: 12 });
+      gsap.set(hiyeRef.value, { autoAlpha: 0, scale: 0.93 });
+      gsap.set(heroContentRef.value, { autoAlpha: 0, yPercent: 6 });
+      gsap.set(buttonWrapperRef.value, { autoAlpha: 0, yPercent: 8 });
+
+      // Entrance sequence
+      const tl = gsap.timeline({ delay: 0.1 });
+
+      tl
+        // Logos slide in from their respective sides simultaneously
+        .to(logoLeftRef.value, {
+          autoAlpha: 1,
+          xPercent: 0,
+          duration: 1.2,
+          ease: "power3.out",
+        })
+        .to(
+          logoRightRef.value,
+          {
+            autoAlpha: 1,
+            xPercent: 0,
+            duration: 1.2,
+            ease: "power3.out",
+          },
+          "<0.1",
+        ) // 0.1 s after left logo starts
+        .to(
+          heroContentRef.value,
+          {
+            autoAlpha: 1,
+            yPercent: 0,
+            duration: 0.9,
+            ease: "power3.out",
+          },
+          "-=0.6",
+        )
+        .to(
+          buttonWrapperRef.value,
+          {
+            autoAlpha: 1,
+            yPercent: 0,
+            duration: 0.7,
+            ease: "power3.out",
+          },
+          "-=0.5",
+        );
+
+      // Returned function runs when leaving BP.desktop (resize / unmount)
+      // GSAP reverts the tween states automatically; add non-GSAP cleanup here.
+      return () => {};
+    });
+
+    // ── Mobile ───────────────────────────────────────────────────────────────
+    mm.add(BP.mobile, () => {
+      // Simpler: just fade up — no horizontal slide on small screens
+      gsap.set([logoLeftRef.value, logoRightRef.value], {
+        autoAlpha: 0,
+        yPercent: 5,
+      });
+
+      gsap
+        .timeline({ delay: 0.08 })
+        .to([logoLeftRef.value, logoRightRef.value], {
+          autoAlpha: 1,
+          yPercent: 0,
+          duration: 0.9,
+          ease: "power3.out",
+          stagger: 0.1,
+        });
+
+      return () => {};
+    });
+
+    // ── Reduced motion: show everything immediately ───────────────────────
+    mm.add(BP.reducedMotion, () => {
+      gsap.set(
+        [
+          logoLeftRef.value,
+          logoRightRef.value,
+          hiyeRef.value,
+          heroContentRef.value,
+          buttonWrapperRef.value,
+        ],
+        { clearProps: "all" },
+      );
+
+      return () => {};
+    });
+
+    // One shared debounced refresh — collapses with calls from other components
+    scheduleRefresh();
+  });
+});
 </script>
 <style lang="scss" scoped>
 .hero-section {
@@ -184,9 +296,10 @@ import ButtonComponent from "../layout/ButtonComponent.vue";
   display: flex;
   justify-content: space-between;
   flex-direction: column;
-  gap: 2rem;
+  gap: 5rem;
   position: relative;
   color: var(--theme-color);
+  padding-inline: var(--content-margin);
 
   @include respond-to("desktop") {
     gap: 0;
@@ -253,6 +366,8 @@ import ButtonComponent from "../layout/ButtonComponent.vue";
   transform: translateX(-50%);
   height: 100%;
   width: 77.29%;
+  z-index: 1;
+  padding-right: var(--content-margin);
 
   @include respond-to("desktop") {
     transform: translateX(0);
@@ -277,7 +392,7 @@ h1 span {
   justify-content: center;
   @include respond-to("desktop") {
     position: absolute;
-    left: 0;
+    left: var(--content-margin);
     bottom: 0;
     z-index: 2;
   }

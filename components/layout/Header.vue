@@ -160,14 +160,14 @@ const detectSection = () => {
 .header-nav {
   align-items: center;
   display: none;
+  padding-inline: var(--content-margin);
   @include respond-to("desktop") {
     @include grid;
   }
 }
 
 .header-menu {
-  grid-column-start: 1;
-  grid-column-end: 4;
+  grid-column: 1 / 8;
 }
 
 .menu-list {
@@ -223,8 +223,7 @@ const detectSection = () => {
   display: flex;
   justify-content: flex-end;
   align-items: center;
-  grid-column-start: 4;
-  grid-column-end: 5;
+  grid-column: 8 / 12;
 }
 
 @media (max-width: 768px) {
