@@ -25,8 +25,8 @@
 
 @mixin grid {
   display: grid;
-  // Mobile : 6 colonnes égales = MOBILE_COLS
-  grid-template-columns: repeat(6, 1fr);
+  // Mobile : 12 colonnes égales = MOBILE_COLS
+  grid-template-columns: repeat(12, 1fr);
   gap: var(--grid-gap);
 
   // Desktop : 11 colonnes égales = DESKTOP_COLS (aligné pixel-perfect avec LayoutGridCss)

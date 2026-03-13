@@ -24,12 +24,12 @@ const props = withDefaults(
 const lineColor = computed(() => (props.color === "black" ? "black" : "white"));
 </script>
 
-<style scoped>
+<style lang="scss" scoped>
 .layout-lines {
   position: absolute;
   inset: 0;
   pointer-events: none;
-  z-index: 1;
+  z-index: 0;
   mix-blend-mode: luminosity;
 }
 
@@ -37,28 +37,85 @@ const lineColor = computed(() => (props.color === "black" ? "black" : "white"));
   height: 100%;
 }
 
-/* Chaque div couvre exactement les colonnes pixel correspondantes */
 .col-a {
-  grid-column: 1 / 3;
+  grid-column: 0 / 1;
 }
 .col-b {
-  grid-column: 3 / 4;
+  grid-column: 2 / 4;
 }
 .col-c {
-  grid-column: 4 / 8;
+  grid-column: 5 / 8;
 }
 .col-d {
   grid-column: 8 / 12;
 }
 
+/* Chaque div couvre exactement les colonnes pixel correspondantes */
+@include respond-to("desktop") {
+  .layout-lines {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    z-index: 0;
+    mix-blend-mode: luminosity;
+    visibility: hidden;
+  }
+
+  .layout-lines__grid {
+    height: 100%;
+  }
+  .col-a {
+    grid-column: 1 / 3;
+    position: relative;
+    &::after {
+      content: "";
+      position: absolute;
+      top: 0;
+      left: var(--content-margin); /* 1 colonne pixel */
+      border-right: 1px solid v-bind(lineColor);
+      height: 100%;
+      z-index: 20;
+    }
+  }
+  .col-b {
+    grid-column: 3 / 4;
+  }
+  .col-c {
+    grid-column: 4 / 8;
+  }
+  .col-d {
+    position: relative;
+    grid-column: 8 / 12;
+    &::after {
+      content: "";
+      position: absolute;
+      top: 0;
+      right: var(--content-margin); /* 1 colonne pixel */
+      border-right: 1px solid v-bind(lineColor);
+      height: 100%;
+      z-index: 20;
+    }
+  }
+}
+
 .layout-lines__col {
   border-right: 1px solid v-bind(lineColor);
   height: 100%;
-  opacity: 0.35;
 }
 
 .col-a {
   border-left: 1px solid v-bind(lineColor);
-  opacity: 0.35;
+}
+
+.layout-lines__col,
+.col-a {
+  opacity: 0.15;
+}
+
+@include respond-to("desktop") {
+  .layout-lines__col,
+  .col-a {
+    opacity: 0.35;
+  }
 }
 </style>

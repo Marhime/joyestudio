@@ -1,7 +1,10 @@
 <template>
   <Hero />
   <About />
-  <div class="placeholder"></div>
+  <Services />
+  <OurProjects />
+  <OurTeam />
+  <Contact />
 </template>
 
 <script lang="ts" setup>

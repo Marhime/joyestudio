@@ -21,11 +21,11 @@
             ><span hiye-face-placeholder class="face-placeholder"></span
             ><span>a digital</span>
           </span>
-          <span class="icon"><IconRightArrow /></span
+          <span class="icon"><RightArrow /></span
           ><span class="about__content-line--4">presence that feels</span>
           <span
             class="about__content-line about__content-line--5 font-italic font-como t2-h2"
-            ><span class="icon-mobile"><IconRightArrow /></span>
+            ><span class="icon-mobile"><RightArrow /></span>
             <span>as good as it looks</span></span
           >
         </h3>
@@ -47,6 +47,8 @@
 </template>
 
 <script setup>
+import RightArrow from "../icons/RightArrow.vue";
+
 const { $gsap, $Flip } = useNuxtApp();
 
 const sectionRef = ref(null);
@@ -142,9 +144,9 @@ onUnmounted(() => {
 <style lang="scss" scoped>
 .about {
   position: relative;
-  padding-top: 10rem;
   padding-bottom: 6.6rem;
   z-index: 0;
+  visibility: hidden;
   @include respond-to("desktop") {
     padding-top: 30rem;
   }
@@ -166,12 +168,11 @@ onUnmounted(() => {
         color: var(--color-black);
       }
       @include respond-to("desktop") {
-        color: black;
-        align-self: flex-end;
         display: block;
+        align-self: flex-end;
         width: 12.5rem;
-        grid-column-start: 2;
-        grid-column-end: 2;
+        grid-column-start: 3;
+        grid-column-end: 4;
       }
     }
   }
@@ -212,26 +213,26 @@ onUnmounted(() => {
     &-line {
       line-height: 1;
       &--1 {
-        grid-column-start: 2;
-        grid-column-end: 5;
+        grid-column-start: 4;
+        grid-column-end: -1;
       }
       &--2 {
-        grid-column-start: 1;
-        grid-column-end: 5;
+        grid-column-start: 2;
+        grid-column-end: -1;
       }
       &--3 {
-        grid-column-start: 1;
-        grid-column-end: 5;
+        grid-column-start: 2;
+        grid-column-end: -1;
         display: flex;
         gap: 0.5rem;
       }
       &--4 {
-        grid-column-start: 1;
-        grid-column-end: 5;
+        grid-column-start: 2;
+        grid-column-end: -1;
       }
       &--5 {
-        grid-column-start: 1;
-        grid-column-end: 5;
+        grid-column-start: 2;
+        grid-column-end: -1;
         display: flex;
         align-items: center;
         gap: 1rem;
@@ -283,8 +284,8 @@ onUnmounted(() => {
     @include grid;
     margin-top: 9.5rem;
     .text-wrapper {
-      grid-column-start: 2;
-      grid-column-end: 5;
+      grid-column-start: 4;
+      grid-column-end: 11;
       p {
         font-size: 1.1rem;
         text-transform: uppercase;

@@ -50,9 +50,15 @@ import ButtonComponent from "../layout/ButtonComponent.vue";
     display: flex;
     flex-direction: column;
     font-weight: 100;
-    grid-column-start: 1;
-    grid-column-end: 3;
+    grid-column-start: 2;
+    grid-column-end: 5;
     line-height: 0.65;
+
+    @include respond-to("desktop") {
+      grid-column-start: 1;
+      grid-column-end: 4;
+      padding-left: var(--content-margin);
+    }
   }
 
   .t1-h3-accent {
@@ -61,9 +67,18 @@ import ButtonComponent from "../layout/ButtonComponent.vue";
 
   .description {
     grid-column-start: 4;
-    grid-column-end: 5;
+    grid-column-end: 10;
+    grid-row: 2;
     display: flex;
     align-items: flex-end;
+    margin-top: 2.4rem;
+
+    @include respond-to("desktop") {
+      grid-column-start: 8;
+      grid-column-end: 11;
+      grid-row: 1;
+      margin-top: 0;
+    }
   }
 
   .t1-body {
@@ -86,48 +101,92 @@ import ButtonComponent from "../layout/ButtonComponent.vue";
 
   .project {
     &:nth-child(1) {
-      grid-column-start: 1;
-      grid-column-end: 4;
+      grid-column-start: 2;
+      grid-column-end: 12;
     }
     &:nth-child(2) {
-      grid-column-start: 4;
-      grid-column-end: 5;
-      width: 66.66667%;
+      grid-column-start: 2;
+      grid-column-end: 8;
       justify-self: flex-end;
       .project-overview {
         flex-direction: column;
       }
     }
     &:nth-child(3) {
-      grid-column-start: 1;
-      grid-column-end: 3;
+      grid-column-start: 3;
+      grid-column-end: 8;
+      // padding-left: var(--content-margin);
     }
     &:nth-child(4) {
-      grid-column-start: 4;
-      grid-column-end: 5;
+      grid-column-start: 3;
+      grid-column-end: 12;
     }
     &:nth-child(5) {
-      grid-column-start: 3;
-      grid-column-end: 4;
-      width: 50%;
+      grid-column-start: 2;
+      grid-column-end: 12;
     }
     &:nth-child(6) {
       grid-column-start: 3;
-      grid-column-end: 5;
-      width: 75%;
-      justify-self: flex-end;
+      grid-column-end: 12;
     }
     &:nth-child(7) {
-      grid-column-start: 1;
-      grid-column-end: 4;
-      width: 68%;
+      grid-column-start: 2;
+      grid-column-end: 12;
     }
     &:nth-child(8) {
-      grid-column-start: 4;
-      grid-column-end: 5;
-      width: 66.66667%;
-      justify-self: flex-end;
-      align-self: flex-end;
+      grid-column-start: 3;
+      grid-column-end: 8;
+    }
+
+    @include respond-to("desktop") {
+      &:nth-child(1) {
+        grid-column-start: 1;
+        grid-column-end: 8;
+        padding-left: var(--content-margin);
+      }
+      &:nth-child(2) {
+        grid-column-start: 10;
+        grid-column-end: 12;
+        padding-left: 0;
+        padding-right: var(--content-margin);
+        justify-self: flex-start;
+        .project-overview {
+          flex-direction: row;
+        }
+      }
+      &:nth-child(3) {
+        grid-column-start: 1;
+        grid-column-end: 4;
+        padding-left: var(--content-margin);
+      }
+      &:nth-child(4) {
+        grid-column-start: 8;
+        grid-column-end: 12;
+        padding-right: var(--content-margin);
+      }
+      &:nth-child(5) {
+        grid-column-start: 4;
+        grid-column-end: 6;
+      }
+      &:nth-child(6) {
+        grid-column-start: 6;
+        grid-column-end: 12;
+        grid-row: 4;
+        padding-right: var(--content-margin);
+      }
+      &:nth-child(7) {
+        grid-column-start: 1;
+        grid-column-end: 6;
+        padding-left: var(--content-margin);
+        grid-row: 5;
+      }
+      &:nth-child(8) {
+        grid-column-start: 10;
+        grid-column-end: 12;
+        padding-right: var(--content-margin);
+        align-self: flex-end;
+        grid-row: 5;
+      }
     }
   }
 }

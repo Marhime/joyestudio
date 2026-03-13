@@ -1,5 +1,5 @@
 export function useLogoFlip() {
-  const { $gsap, $Flip } = useNuxtApp();
+  const { gsap, Flip } = useGSAP();
 
   let logoLeftRef: Element | null = null;
   let logoRightRef: Element | null = null;
@@ -45,7 +45,7 @@ export function useLogoFlip() {
     const initialRightRect = logoRightPlaceholderRef.getBoundingClientRect();
 
     // Position fixed sur les placeholders (coordonnées viewport)
-    $gsap.set(logoLeftRef, {
+    gsap.set(logoLeftRef, {
       position: "fixed",
       top: initialLeftRect.top,
       left: initialLeftRect.left,
@@ -54,7 +54,7 @@ export function useLogoFlip() {
       zIndex: 1000,
     });
 
-    $gsap.set(logoRightRef, {
+    gsap.set(logoRightRef, {
       position: "fixed",
       top: initialRightRect.top,
       left: initialRightRect.left,
@@ -64,8 +64,8 @@ export function useLogoFlip() {
     });
 
     // Capture où se trouvent les conteneurs header (destination du flip)
-    finalStateLeft = $Flip.getState(finalLeftContainer);
-    finalStateRight = $Flip.getState(finalRightContainer);
+    finalStateLeft = Flip.getState(finalLeftContainer);
+    finalStateRight = Flip.getState(finalRightContainer);
   };
 
   /**
@@ -82,12 +82,12 @@ export function useLogoFlip() {
 
     const flipConfig = { ease: "none", duration: 1 };
 
-    const leftTween = $Flip.fit(logoLeftRef, finalStateLeft, flipConfig);
+    const leftTween = Flip.fit(logoLeftRef, finalStateLeft, flipConfig);
     if (leftTween) {
       tl.add(leftTween as gsap.core.Tween, position);
     }
 
-    const rightTween = $Flip.fit(logoRightRef, finalStateRight, flipConfig);
+    const rightTween = Flip.fit(logoRightRef, finalStateRight, flipConfig);
     if (rightTween) {
       tl.add(rightTween as gsap.core.Tween, "<");
     }
@@ -97,7 +97,7 @@ export function useLogoFlip() {
    * Remet les logos en position initiale (utile lors d'un resize).
    */
   const reset = () => {
-    $gsap.set([logoLeftRef, logoRightRef], { clearProps: "all" });
+    gsap.set([logoLeftRef, logoRightRef], { clearProps: "all" });
     finalStateLeft = undefined;
     finalStateRight = undefined;
   };

@@ -119,6 +119,13 @@ a {
   --font-cormorant: "Cormorant Garamond", serif;
 }
 
+.pink {
+  color: var(--color-pink);
+}
+.blue {
+  color: var(--color-blue);
+}
+
 .align-end {
   align-self: flex-end;
 }
@@ -521,7 +528,7 @@ html {
 
 .t2-h2,
 .type-2 h2 {
-  font-size: 5.2rem; /* 52px mobile */
+  font-size: 5.5rem; /* 55px mobile */
   line-height: 1.21; /* 63/52 */
   letter-spacing: -0.05em;
   font-weight: 700;

@@ -44,16 +44,25 @@ defineProps<{
     z-index: 10;
   }
   &-overview {
-    padding-top: 1.5rem;
     display: flex;
-    justify-content: space-between;
-    align-items: center;
-    flex-wrap: wrap;
+    flex-direction: column;
+    padding-top: 1.5rem;
     gap: 1rem;
+    @include respond-to("desktop") {
+      flex-direction: row;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+    }
   }
   &-overview__chips {
     display: flex;
+    flex-wrap: wrap;
     gap: 1rem;
+
+    @include respond-to("desktop") {
+      flex-wrap: nowrap;
+    }
   }
   &-overview__chip {
     padding: 0 1rem;
@@ -62,9 +71,14 @@ defineProps<{
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 1.8rem;
+    font-size: 1.1rem;
     line-height: 1;
-    height: 4rem;
+    height: 2.3rem;
+
+    @include respond-to("desktop") {
+      height: 4rem;
+      font-size: 1.8rem;
+    }
   }
 }
 </style>

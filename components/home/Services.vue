@@ -8,10 +8,8 @@
       <div class="service service--1">
         <div class="service__container grid-container">
           <div class="grid-template">
-            <div class="service__title">
-              <p class="t1-body-accent">01</p>
-              <p class="t1-h3">Web & Mobile</p>
-            </div>
+            <p class="t1-body-accent service__number">01</p>
+            <p class="t1-h3 service__title">Web & Mobile</p>
             <div class="service__timeline t1-body">
               <p class="service__timeline--title">Timeline</p>
               <p>5-6 weeks</p>
@@ -46,10 +44,8 @@
       <div class="service service--2">
         <div class="service__container grid-container">
           <div class="grid-template">
-            <div class="service__title">
-              <p class="t1-body-accent">02</p>
-              <p class="t1-h3">Brand strategy</p>
-            </div>
+            <p class="t1-body-accent service__number">02</p>
+            <p class="t1-h3 service__title">Brand strategy</p>
             <div class="service__timeline t1-body">
               <p class="service__timeline--title">Timeline</p>
               <p>3-4 weeks</p>
@@ -84,10 +80,8 @@
       <div class="service service--3">
         <div class="service__container grid-container">
           <div class="grid-template">
-            <div class="service__title">
-              <p class="t1-body-accent">03</p>
-              <p class="t1-h3">Strategy & Content</p>
-            </div>
+            <p class="t1-body-accent service__number">03</p>
+            <p class="t1-h3 service__title">Strategy & Content</p>
             <div class="service__timeline t1-body">
               <p class="service__timeline--title">Timeline</p>
               <p>3-4 weeks</p>
@@ -237,13 +231,24 @@ section {
   z-index: 5;
   height: 100svh;
 
+  @include respond-to("desktop") {
+    padding-bottom: 4rem;
+  }
+
   &__title-container {
     display: flex;
     align-items: center;
-    padding-top: 10rem;
-    padding-bottom: 5rem;
+    padding-block: 2.5rem;
+    padding-inline: var(--content-margin);
+    position: relative;
+    z-index: 1;
     h2 {
       color: var(--color-black);
+    }
+
+    @include respond-to("desktop") {
+      padding-top: 10rem;
+      padding-bottom: 5rem;
     }
   }
 }
@@ -264,12 +269,25 @@ section {
     z-index: 3;
   }
 
-  &__title {
-    grid-column: 1 / 8;
+  &__number {
+    grid-column: 2 / 4;
     font-weight: 400;
-    display: flex;
     align-items: start;
-    gap: 8rem;
+
+    @include respond-to("desktop") {
+      padding-left: var(--content-margin);
+      grid-column: 1 / 2;
+    }
+  }
+
+  &__title {
+    grid-column: 4 / 12;
+    font-family: var(--font-cormorant);
+
+    @include respond-to("desktop") {
+      grid-column: 2 / 8;
+      padding-left: var(--content-margin);
+    }
   }
 
   .t1-h3 {
@@ -291,6 +309,7 @@ section {
     position: relative;
     z-index: 1;
   }
+
   &__timeline {
     grid-column: 8 / 12;
     display: flex;
@@ -298,6 +317,7 @@ section {
     align-items: end;
     justify-content: space-between;
     padding-top: 5rem;
+    padding-right: var(--content-margin);
     color: var(--color-black);
 
     &--title {
@@ -310,14 +330,23 @@ section {
     height: 100%;
     margin-top: 2rem;
     &--text--1 {
-      grid-column: 1 / 3;
+      grid-column: 4 / 12;
       align-self: flex-end;
+
+      @include respond-to("desktop") {
+        padding-left: var(--content-margin);
+        grid-column: 1 / 3;
+      }
     }
     &--text--2 {
       grid-column: 4 / 8;
       display: flex;
       align-self: flex-end;
       gap: 3rem;
+
+      @include respond-to("desktop") {
+        grid-column: 4 / 8;
+      }
 
       ul {
         list-style: none;
@@ -327,11 +356,19 @@ section {
       }
     }
     &--image {
-      grid-column: 8 / 12;
+      grid-column: 2 / 12;
       display: flex;
       height: 100%;
+      margin-top: 4.5rem;
       img {
         object-fit: cover;
+      }
+
+      @include respond-to("desktop") {
+        grid-column: 8 / 12;
+        justify-content: flex-end;
+        margin-top: 0;
+        padding-right: var(--content-margin);
       }
     }
   }

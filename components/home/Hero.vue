@@ -275,11 +275,11 @@ onMounted(() => {
 .hero-section {
   position: relative;
   width: 100%;
-  height: 100vh;
   padding-top: 14.8rem;
 
   @include respond-to("desktop") {
     padding-top: 23.1vh;
+    min-height: 100vh;
   }
 }
 
@@ -296,12 +296,12 @@ onMounted(() => {
   display: flex;
   justify-content: space-between;
   flex-direction: column;
-  gap: 5rem;
+  gap: 2rem;
   position: relative;
   color: var(--theme-color);
   padding-inline: var(--content-margin);
 
-  @include respond-to("desktop") {
+  @include respond-to("tablet") {
     gap: 0;
   }
 
@@ -343,12 +343,13 @@ onMounted(() => {
     position: absolute;
     top: 50%;
     left: 50%;
-    transform: translate(-50%, -50%);
+    transform: translate(-50%, -100%);
     width: 52.94%;
-    z-index: 1;
+    z-index: 10;
     visibility: hidden;
 
     @include respond-to("desktop") {
+      transform: translate(-50%, -50%);
       left: 47%;
       width: 35.29%;
     }

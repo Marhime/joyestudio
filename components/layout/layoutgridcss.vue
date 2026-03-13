@@ -48,7 +48,7 @@ const currentCols = ref(11);
 
 // Configuration responsive — align MOBILE_BREAKPOINT with BP.desktop (901px)
 const DESKTOP_COLS = 11;
-const MOBILE_COLS = 6;
+const MOBILE_COLS = 12;
 const MOBILE_BREAKPOINT = 901;
 
 /**
@@ -155,6 +155,8 @@ const getAllSquaresWithoutSome = (excludeIndices) => {
 const setupAnimations = () => {
   if (!gridContainer.value) return;
 
+  const layoutLines = gridContainer.value.querySelector(".layout-lines");
+
   // ── Reset previous state ───────────────────────────────────────────────────
   // mm.revert() kills all previously enrolled ScrollTriggers + tweens from this
   // component, then re-registers fresh mm.add() conditions below.
@@ -237,6 +239,7 @@ const setupAnimations = () => {
         },
         "<",
       )
+      .to(layoutLines, { autoAlpha: 0, duration: 0.5 }, "<") // Lines fade with logo squares
       // 6. Button area squares dissolve
       .to(buttonSquares, { autoAlpha: 0, duration: 0.5 }, "<")
       // 7. Header button styles transition into their final state
@@ -299,11 +302,15 @@ const setupAnimations = () => {
   scheduleRefresh();
 };
 
-// Debounced resize handler
-const handleResize = debounce(() => {
-  resetFlip(); // Nettoie les états Flip avant de recalculer
+// Debounced resize handler.
+// Always rebuilds animations after resize so Flip re-captures fresh viewport
+// coordinates — even when totalSquares doesn't change (same rows × cols).
+const handleResize = debounce(async () => {
+  resetFlip();
   calculateGridSize();
-  console.log("First row squares:", getFirstRowSquares());
+  await nextTick(); // wait for any DOM updates triggered by calculateGridSize
+  initFlip();
+  setupAnimations();
 }, 150);
 
 // Watch for changes in totalSquares to setup listeners when DOM is ready

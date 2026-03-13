@@ -12,16 +12,16 @@ export const projects = [
     description:
       "Identité visuelle, site web, signalétique et supports de communication pour un restaurant gastronomique à Nantes.",
     image: "/images/projects/project-1/project-1-thumbnail.png",
-    chips: ["Identité", "Web", "Mobileeeee"],
+    chips: ["Identité", "Web", "Mobile"],
     link: "/projets/atelier-ile",
   },
   {
-    name: "L'Atelier de l'Île",
+    name: "ONWARD",
     description:
       "Identité visuelle, site web, signalétique et supports de communication pour un restaurant gastronomique à Nantes.",
     image: "/images/projects/project-1/project-1-thumbnail.png",
-    chips: ["Identité visuelle", "Web design", "Signalétique"],
-    link: "/projets/atelier-ile",
+    chips: ["Content", "Web design", "USA"],
+    link: "/projets/onward",
   },
   {
     name: "L'Atelier de l'Île",
