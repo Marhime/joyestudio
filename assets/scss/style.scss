@@ -28,7 +28,7 @@
 
 body {
   /* 5. Improve text rendering */
-  font-family: "Acumin Pro", sans-serif;
+  font-family: var(--font-inter);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   text-rendering: optimizeLegibility;
@@ -406,7 +406,7 @@ html {
 .t1-h1,
 .type-1 h1 {
   font-size: 13.5rem; /* 135px mobile */
-  line-height: 1.21; /* 163/135 */
+  // line-height: 1.21; /* 163/135 */
   letter-spacing: -0.05em;
   font-weight: 700;
   margin: 0;
@@ -415,7 +415,6 @@ html {
 .t1-h2,
 .type-1 h2 {
   font-size: 4rem; /* 40px mobile */
-  line-height: 1.2; /* 48/40 */
   letter-spacing: -0.05em;
   font-weight: 700;
   margin: 0;
@@ -424,7 +423,6 @@ html {
 .t1-h3,
 .type-1 h3 {
   font-size: 3.3rem; /* 33px mobile */
-  line-height: 1.21; /* 40/33 */
   letter-spacing: -0.08em; /* Design spec mobile */
   font-weight: 700;
   margin: 0;
@@ -433,7 +431,6 @@ html {
 .t1-h4,
 .type-1 h4 {
   font-size: 2.5rem; /* 25px mobile */
-  line-height: 1.2; /* 30/25 */
   letter-spacing: -0.05em;
   font-weight: 700;
   margin: 0;
@@ -442,7 +439,6 @@ html {
 .t1-body-accent,
 .type-1 .body-accent {
   font-size: 2.4rem; /* 24px mobile */
-  line-height: 1.21; /* 29/24 */
   letter-spacing: -0.03em;
   font-weight: 500;
   margin: 0;
@@ -452,7 +448,6 @@ html {
 .type-1 p,
 .type-1 .body {
   font-size: 1.15rem; /* 11px mobile */
-  line-height: 1.18; /* 13/11 */
   letter-spacing: -0.03em;
   font-weight: 400;
   margin: 0;
@@ -466,46 +461,40 @@ html {
   .t1-h1,
   .type-1 h1 {
     font-size: 34.5rem; /* 345px desktop */
-    line-height: 1.21; /* 417/345 */
     letter-spacing: -0.05em;
   }
 
   .t1-h2,
   .type-1 h2 {
     font-size: 12.6rem; /* 155px desktop */
-    line-height: 1.21; /* 187/155 */
   }
 
   .t1-h3,
   .type-1 h3 {
     font-size: 11rem; /* 110px desktop */
-    line-height: 0.91; /* 100/110 */
     letter-spacing: -0.05em; /* Retour à -5% sur desktop */
   }
 
   .t1-h3-accent,
   .type-1 .h3-accent {
     font-size: 15.6rem; /* 156px desktop */
-    line-height: 0.91; /* 100/110 */
   }
 
   .t1-h4,
   .type-1 h4 {
     font-size: 6.6rem; /* 66px desktop */
-    line-height: 1.21; /* 80/66 */
   }
 
   .t1-body-accent,
   .type-1 .body-accent {
     font-size: 2.4rem; /* Reste 24px */
-    line-height: 1.21; /* 29/24 */
   }
 
   .t1-body,
   .type-1 p,
   .type-1 .body {
     font-size: 1.8rem; /* 18px desktop */
-    line-height: 1.21; /* 21.8/18 */
+    line-height: 1.18;
   }
 
   .uppercase {
@@ -520,7 +509,6 @@ html {
 .t2-h1,
 .type-2 h1 {
   font-size: 18.7rem; /* 187px mobile */
-  line-height: 1.21; /* 226/187 */
   letter-spacing: -0.05em;
   font-weight: 700;
   margin: 0;
@@ -529,7 +517,6 @@ html {
 .t2-h2,
 .type-2 h2 {
   font-size: 5.5rem; /* 55px mobile */
-  line-height: 1.21; /* 63/52 */
   letter-spacing: -0.05em;
   font-weight: 700;
   margin: 0;
@@ -538,7 +525,6 @@ html {
 .t2-h3,
 .type-2 h3 {
   font-size: 4.5rem; /* 45px mobile */
-  line-height: 2.22; /* 100/45 */
   letter-spacing: -0.05em;
   font-weight: 700;
   margin: 0;
@@ -547,7 +533,6 @@ html {
 .t2-h4,
 .type-2 h4 {
   font-size: 3.5rem; /* 35px mobile */
-  line-height: 1.2; /* 42/35 */
   letter-spacing: -0.05em;
   font-weight: 700;
   margin: 0;
@@ -556,7 +541,6 @@ html {
 .t2-body-accent,
 .type-2 .body-accent {
   font-size: 1rem; /* 10px mobile */
-  line-height: 1.9; /* 19/10 */
   letter-spacing: -0.08em;
   font-weight: 500;
   margin: 0;
@@ -570,31 +554,26 @@ html {
   .t2-h1,
   .type-2 h1 {
     font-size: 43.5rem; /* 435px desktop */
-    line-height: 1.21; /* 526.8/435 */
   }
 
   .t2-h2,
   .type-2 h2 {
     font-size: 18rem; /* 210px desktop */
-    line-height: 1.21; /* 254.3/210 */
   }
 
   .t2-h3,
   .type-2 h3 {
     font-size: 15.2rem; /* 152px desktop */
-    line-height: 0.66; /* 100/152 */
   }
 
   .t2-h4,
   .type-2 h4 {
     font-size: 8.3rem; /* 83px desktop */
-    line-height: 1.21; /* 100.5/83 */
   }
 
   .t2-body-accent,
   .type-2 .body-accent {
     font-size: 2.1rem; /* 21px desktop */
-    line-height: 0.9; /* 19/21 */
   }
 }
 

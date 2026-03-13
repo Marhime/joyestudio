@@ -64,7 +64,6 @@ import RightArrow from "../icons/RightArrow.vue";
   }
 
   &__content {
-    font-family: var(--font-inter);
     line-height: 1;
     align-items: center;
     color: var(--color-white);

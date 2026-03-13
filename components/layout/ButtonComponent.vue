@@ -143,7 +143,6 @@ defineProps(["href", "label", "labelSecondary", "target"]);
   padding: 24.5px;
   gap: 50.5px;
   text-decoration: none;
-  font-family: var(--font-inter);
 
   --button-icon: var(--color-blue);
   --button-bg: var(--color-white);

@@ -146,7 +146,6 @@ onUnmounted(() => {
   position: relative;
   padding-bottom: 6.6rem;
   z-index: 0;
-  visibility: hidden;
   @include respond-to("desktop") {
     padding-top: 30rem;
   }
@@ -200,7 +199,6 @@ onUnmounted(() => {
   }
 
   &__content {
-    font-family: var(--font-inter);
     line-height: 1;
     align-items: center;
     color: var(--color-black);

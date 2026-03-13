@@ -6,9 +6,9 @@
     <main class="main-content">
       <slot />
     </main>
-    <LayoutGridCss />
-    <!-- Sphère 3D — overlay fixe, commun à toutes les pages -->
-    <PixelBlob3 ref="pixelBlobRef" />
+    <!-- Sphère 3D — overlay fixe, commun à toutes les pages 
+      <LayoutGridCss />
+    <PixelBlob3 ref="pixelBlobRef" />-->
     <Footer />
   </div>
 </template>

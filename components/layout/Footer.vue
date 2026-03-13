@@ -66,7 +66,6 @@ footer {
   }
   .link {
     font-size: 1.5rem;
-    font-family: var(--font-inter);
   }
   .first-column {
     grid-column-start: 2;
@@ -152,7 +151,6 @@ footer {
     }
     .link {
       font-size: 1.5rem;
-      font-family: var(--font-inter);
     }
     .first-column {
       grid-column-start: 1;

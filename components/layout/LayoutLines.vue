@@ -58,7 +58,7 @@ const lineColor = computed(() => (props.color === "black" ? "black" : "white"));
     pointer-events: none;
     z-index: 0;
     mix-blend-mode: luminosity;
-    visibility: hidden;
+    // visibility: hidden;
   }
 
   .layout-lines__grid {
