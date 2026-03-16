@@ -472,22 +472,11 @@ onMounted(() => {
       row5Ref.value,
     ].filter(Boolean);
 
-    // Initial hidden states — before autoAlpha reveal to avoid FOUC
+    // Initial hidden states — GSAP owns the rows from the start
     gsap.set(allWraps, { opacity: 0, y: 5 });
     gsap.set(allRows, { visibility: "hidden" });
-    gsap.set(formRef.value, { autoAlpha: 1 });
 
-    mm.add(BP.desktop, () => {
-      activateStep(1);
-      return () => {};
-    });
-
-    mm.add(BP.mobile, () => {
-      activateStep(1);
-      return () => {};
-    });
-
-    // Reduced motion: fill text instantly, skip cursors
+    // Reduced motion: fill text instantly, no animation
     mm.add(BP.reducedMotion, () => {
       const textEls = [
         text1Ref.value,
@@ -506,6 +495,14 @@ onMounted(() => {
       return () => {};
     });
 
+    // activateStep(1) is identical on desktop and mobile — no need for mm.add.
+    // Calling directly avoids a known Nuxt client-side navigation issue where
+    // pageTransition temporarily disrupts window.matchMedia evaluation,
+    // causing mm.add callbacks to silently not fire on route changes.
+    if (!window.matchMedia(BP.reducedMotion).matches) {
+      activateStep(1);
+    }
+
     scheduleRefresh();
   });
 });
@@ -521,7 +518,10 @@ onUnmounted(() => {
   z-index: 1;
   padding-top: 27rem;
   color: var(--color-white);
-  visibility: hidden;
+  // No visibility: hidden here — the form container is always visible.
+  // Individual rows are hidden by GSAP and revealed step-by-step.
+  // (visibility: hidden here would break client-side navigation since
+  //  gsap.set autoAlpha only works reliably on elements GSAP previously touched)
 
   // ── Rows ────────────────────────────────────────────────────────────────
   .row {
