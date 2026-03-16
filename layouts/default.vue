@@ -7,8 +7,9 @@
       <slot />
     </main>
     <!-- Sphère 3D — overlay fixe, commun à toutes les pages 
-      <LayoutGridCss />
-    <PixelBlob3 ref="pixelBlobRef" />-->
+     
+    <PixelBlob3 ref="pixelBlobRef" />
+    -->
     <Footer />
   </div>
 </template>
@@ -17,9 +18,10 @@
 import { ref, provide, onMounted, onUnmounted } from "vue";
 import Footer from "~/components/layout/Footer.vue";
 import Header from "~/components/layout/Header.vue";
+import type { SmileyAPI } from "~/types/smiley";
 
 const showGrid = ref(false);
-const pixelBlobRef = ref(null);
+const pixelBlobRef = ref<SmileyAPI | null>(null);
 
 // Rend la sphère accessible depuis n'importe quel composant enfant
 provide("pixelBlob", pixelBlobRef);

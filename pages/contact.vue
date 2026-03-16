@@ -37,17 +37,17 @@ import InteractiveForm from "~/components/contact/InteractiveForm.vue";
 
     &__heading {
       display: block;
-      grid-column: 1 / 5;
+      grid-column: 1 / 6;
       margin-left: var(--content-margin);
       color: var(--color-white);
 
       .title {
-        font-size: 4rem;
+        font-size: 9.2rem;
         line-height: 0.65;
         letter-spacing: -0.075em;
       }
       .title-char {
-        font-size: 5.5rem;
+        font-size: 12.4rem;
         line-height: 0.65;
       }
     }

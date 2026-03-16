@@ -153,6 +153,7 @@
       </div>
     </div>
     <LayoutLines class="line-hero" color="black" />
+    <LayoutGridCss />
   </section>
 </template>
 
