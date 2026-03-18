@@ -1,10 +1,12 @@
 <template>
-  <Hero />
-  <About />
-  <Services />
-  <OurProjects />
-  <OurTeam />
-  <Contact />
+  <div class="home">
+    <Hero />
+    <About />
+    <Services />
+    <OurProjects />
+    <OurTeam />
+    <Contact />
+  </div>
 </template>
 
 <script lang="ts" setup>
@@ -14,6 +16,13 @@ import Hero from "~/components/home/Hero.vue";
 import OurProjects from "~/components/home/OurProjects.vue";
 import OurTeam from "~/components/home/OurTeam.vue";
 import Services from "~/components/home/Services.vue";
+// PageEnterHook is provided by app.vue — Hero.vue consumes it directly via inject.
+// index.vue doesn't need to forward it; Hero is a descendant and inject() traverses
+// the full provider chain automatically.
+
+definePageMeta({
+  pageColor: "var(--color-blue)",
+});
 </script>
 
 <style>

@@ -1,6 +1,8 @@
 <template>
   <section data-theme="dark" ref="sectionRef" class="hero-section">
-    <div class="grid-container">
+    <!-- HomeBgGrid is position:fixed z-index:2 — the blue hero background -->
+    <HomeBgGrid ref="homeBgGridRef" />
+    <div class="container">
       <div class="home-logo">
         <div ref="heroContentRef" class="hero-content">
           <h1 class="t1-body">
@@ -153,15 +155,25 @@
       </div>
     </div>
     <LayoutLines class="line-hero" color="black" />
-    <LayoutGridCss />
   </section>
 </template>
 
 <script setup lang="ts">
 import ButtonComponent from "../layout/ButtonComponent.vue";
+import HomeBgGrid from "~/components/home/HomeBgGrid.vue";
+import { setupHeroGridDissolve } from "~/animations/heroGridDissolve";
 import { useGSAP } from "~/composables/useGSAP";
+import type { PageEnterHook } from "~/composables/usePageTransition";
 
 // ── Refs ────────────────────────────────────────────────────────────────────
+const sectionRef = useTemplateRef<HTMLElement>("sectionRef");
+const homeBgGridRef = useTemplateRef<{
+  getGridData: () => {
+    squares: Element[];
+    cols: number;
+    container: HTMLElement | null;
+  };
+}>("homeBgGridRef");
 const logoLeftRef = useTemplateRef<SVGSVGElement>("logoLeftRef");
 const logoRightRef = useTemplateRef<SVGSVGElement>("logoRightRef");
 const hiyeRef = useTemplateRef<HTMLDivElement>("hiyeRef");
@@ -170,84 +182,31 @@ const buttonWrapperRef = useTemplateRef<HTMLDivElement>("buttonWrapperRef");
 
 // ── GSAP ─────────────────────────────────────────────────────────────────────
 const { gsap, mm, BP, scheduleRefresh } = useGSAP();
+const { $lenis: lenis } = useNuxtApp() as any;
+
+// ── Page enter hook (provided by app.vue via usePageTransition) ────────────────
+const onPageEnter = inject<PageEnterHook>("onPageEnter")!;
 
 onMounted(() => {
   nextTick(() => {
     // ── Desktop ─────────────────────────────────────────────────────────────
-    // mm.add auto-reverts everything inside when leaving the breakpoint.
+    // ① Set hidden initial states — these run during the 2×nextTick window
+    //   while the grid still covers the screen. mm.add auto-reverts on unmount.
     mm.add(BP.desktop, () => {
-      // Set initial states before the page paints
       gsap.set(logoLeftRef.value, { autoAlpha: 0, xPercent: -12 });
       gsap.set(logoRightRef.value, { autoAlpha: 0, xPercent: 12 });
       gsap.set(hiyeRef.value, { autoAlpha: 0, scale: 0.93 });
       gsap.set(heroContentRef.value, { autoAlpha: 0, yPercent: 6 });
       gsap.set(buttonWrapperRef.value, { autoAlpha: 0, yPercent: 8 });
-
-      // Entrance sequence
-      const tl = gsap.timeline({ delay: 0.1 });
-
-      tl
-        // Logos slide in from their respective sides simultaneously
-        .to(logoLeftRef.value, {
-          autoAlpha: 1,
-          xPercent: 0,
-          duration: 1.2,
-          ease: "power3.out",
-        })
-        .to(
-          logoRightRef.value,
-          {
-            autoAlpha: 1,
-            xPercent: 0,
-            duration: 1.2,
-            ease: "power3.out",
-          },
-          "<0.1",
-        ) // 0.1 s after left logo starts
-        .to(
-          heroContentRef.value,
-          {
-            autoAlpha: 1,
-            yPercent: 0,
-            duration: 0.9,
-            ease: "power3.out",
-          },
-          "-=0.6",
-        )
-        .to(
-          buttonWrapperRef.value,
-          {
-            autoAlpha: 1,
-            yPercent: 0,
-            duration: 0.7,
-            ease: "power3.out",
-          },
-          "-=0.5",
-        );
-
-      // Returned function runs when leaving BP.desktop (resize / unmount)
-      // GSAP reverts the tween states automatically; add non-GSAP cleanup here.
       return () => {};
     });
 
     // ── Mobile ───────────────────────────────────────────────────────────────
     mm.add(BP.mobile, () => {
-      // Simpler: just fade up — no horizontal slide on small screens
       gsap.set([logoLeftRef.value, logoRightRef.value], {
         autoAlpha: 0,
         yPercent: 5,
       });
-
-      gsap
-        .timeline({ delay: 0.08 })
-        .to([logoLeftRef.value, logoRightRef.value], {
-          autoAlpha: 1,
-          yPercent: 0,
-          duration: 0.9,
-          ease: "power3.out",
-          stagger: 0.1,
-        });
-
       return () => {};
     });
 
@@ -263,18 +222,79 @@ onMounted(() => {
         ],
         { clearProps: "all" },
       );
-
       return () => {};
     });
 
-    // One shared debounced refresh — collapses with calls from other components
     scheduleRefresh();
+
+    // ② Entrance timeline — fires after grid dissolve + ST.refresh.
+    //    On first load (no active transition) fires on next animation frame.
+    //    setupHeroGridDissolve runs in onComplete so Flip.fit never touches
+    //    the logos while they're still hidden/transforming (avoids transform conflict).
+    onPageEnter(() => {
+      // Lock scroll during the entrance so Flip.fit gets clean positions.
+      // Released in afterEntrance once setupHeroGridDissolve is ready.
+      lenis.stop();
+
+      const afterEntrance = () => {
+        const bg = homeBgGridRef.value;
+        if (bg && sectionRef.value) {
+          setupHeroGridDissolve(
+            { gsap, mm },
+            () => bg.getGridData(),
+            sectionRef.value,
+          );
+        }
+        lenis.start();
+      };
+
+      mm.add(BP.desktop, () => {
+        gsap
+          .timeline({ onComplete: afterEntrance })
+          .to(logoLeftRef.value, {
+            autoAlpha: 1,
+            xPercent: 0,
+            duration: 1.2,
+            ease: "power3.out",
+          })
+          .to(
+            logoRightRef.value,
+            { autoAlpha: 1, xPercent: 0, duration: 1.2, ease: "power3.out" },
+            "<0.1",
+          )
+          .to(
+            heroContentRef.value,
+            { autoAlpha: 1, yPercent: 0, duration: 0.9, ease: "power3.out" },
+            "-=0.6",
+          )
+          .to(
+            buttonWrapperRef.value,
+            { autoAlpha: 1, yPercent: 0, duration: 0.7, ease: "power3.out" },
+            "-=0.5",
+          );
+        return () => {};
+      });
+
+      mm.add(BP.mobile, () => {
+        gsap
+          .timeline({ onComplete: afterEntrance })
+          .to([logoLeftRef.value, logoRightRef.value], {
+            autoAlpha: 1,
+            yPercent: 0,
+            duration: 0.9,
+            ease: "power3.out",
+            stagger: 0.1,
+          });
+        return () => {};
+      });
+    });
   });
 });
 </script>
 <style lang="scss" scoped>
 .hero-section {
   position: relative;
+  z-index: 10; // above HomeBgGrid (z:2), below Header (z:100+)
   width: 100%;
   padding-top: 14.8rem;
 
@@ -286,11 +306,6 @@ onMounted(() => {
 
 .line-hero {
   z-index: 0;
-}
-
-.container {
-  position: relative;
-  margin: 0 5vw;
 }
 
 .home-logo {
@@ -375,7 +390,7 @@ onMounted(() => {
     transform: translateX(0);
     left: unset;
     right: 0;
-    width: 22.13%;
+    width: 105ch;
   }
 }
 

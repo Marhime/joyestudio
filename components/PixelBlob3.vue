@@ -507,6 +507,6 @@ onBeforeUnmount(() => {
   width: 100vw;
   height: 100vh;
   pointer-events: none; /* laisse passer les clics au contenu en dessous */
-  z-index: 1;
+  z-index: 3000; /* au-dessus de tout sauf les éléments UI importants */
 }
 </style>

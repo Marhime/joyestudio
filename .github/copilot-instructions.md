@@ -150,11 +150,20 @@ const handleResize = debounce(() => {
 
 ## File Conventions
 
-| File                              | Responsibility                                |
-| --------------------------------- | --------------------------------------------- |
-| `composables/useGSAP.ts`          | GSAP instance, `mm`, `BP`, `scheduleRefresh`  |
-| `composables/useScrollManager.ts` | Debounced `ScrollTrigger.refresh()` singleton |
-| `composables/useLogoFlip.ts`      | Flip animation state for hero → header logo   |
-| `plugins/gsap.ts`                 | Register all GSAP plugins once                |
-| `plugins/lenis.ts`                | Smooth scroll + ScrollTrigger proxy           |
-| `utils/debounce.ts`               | Shared debounce utility                       |
+| File                                     | Responsibility                                        |
+| ---------------------------------------- | ----------------------------------------------------- |
+| `app.vue`                                | Page transition wiring via `usePageTransition`        |
+| `components/layout/PixelGridOverlay.vue` | Layout-level fixed pixel grid overlay                 |
+| `composables/usePixelGrid.ts`            | Singleton grid API: fill, dissolve, getRows, etc.     |
+| `animations/heroGridDissolve.ts`         | Hero scroll-scrubbed pixel dissolve + logo Flip       |
+| `composables/useGSAP.ts`                 | GSAP instance, `mm`, `BP`, `scheduleRefresh`          |
+| `composables/useScrollManager.ts`        | Debounced `ScrollTrigger.refresh()` singleton         |
+| `composables/useAnimationBus.ts`         | Typed event bus for cross-component orchestration     |
+| `composables/usePageTransition.ts`       | GSAP page transition hooks for `<NuxtPage>`           |
+| `composables/useSectionReveal.ts`        | Breakpoint-aware section animation setup (mm.add DRY) |
+| `composables/useLogoFlip.ts`             | Flip animation state for hero → header logo           |
+| `composables/useSmiley.ts`               | Three.js smiley sphere API (moveTo, track, release)   |
+| `animations/presets.ts`                  | fadeUp, splitReveal, parallax, scrubTimeline          |
+| `plugins/gsap.ts`                        | Register all GSAP plugins once                        |
+| `plugins/lenis.ts`                       | Smooth scroll + ScrollTrigger proxy                   |
+| `utils/debounce.ts`                      | Shared debounce utility                               |

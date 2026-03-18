@@ -1,5 +1,7 @@
 export function useLogoFlip() {
-  const { gsap, Flip } = useGSAP();
+  // useNuxtApp() instead of useGSAP() — this function is called from onMounted
+  // (not from setup()), so lifecycle hooks must not be registered here.
+  const { $gsap: gsap, $Flip: Flip } = useNuxtApp();
 
   let logoLeftRef: Element | null = null;
   let logoRightRef: Element | null = null;

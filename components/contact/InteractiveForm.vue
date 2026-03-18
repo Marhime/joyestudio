@@ -495,17 +495,18 @@ onMounted(() => {
       return () => {};
     });
 
-    // activateStep(1) is identical on desktop and mobile — no need for mm.add.
-    // Calling directly avoids a known Nuxt client-side navigation issue where
-    // pageTransition temporarily disrupts window.matchMedia evaluation,
-    // causing mm.add callbacks to silently not fire on route changes.
-    if (!window.matchMedia(BP.reducedMotion).matches) {
-      activateStep(1);
-    }
-
     scheduleRefresh();
   });
 });
+
+// Called by the parent page (contact.vue) from its onPageEnter callback,
+// so the typewriter starts in sync with the form container fading in.
+const start = () => {
+  if (!window.matchMedia(BP.reducedMotion).matches) {
+    activateStep(1);
+  }
+};
+defineExpose({ start });
 
 onUnmounted(() => {
   smiley.release();

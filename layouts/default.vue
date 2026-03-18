@@ -8,7 +8,6 @@
     </main>
     <!-- Sphère 3D — overlay fixe, commun à toutes les pages 
      
-    <PixelBlob3 ref="pixelBlobRef" />
     -->
     <Footer />
   </div>
@@ -21,10 +20,6 @@ import Header from "~/components/layout/Header.vue";
 import type { SmileyAPI } from "~/types/smiley";
 
 const showGrid = ref(false);
-const pixelBlobRef = ref<SmileyAPI | null>(null);
-
-// Rend la sphère accessible depuis n'importe quel composant enfant
-provide("pixelBlob", pixelBlobRef);
 
 const toggleGrid = (e: KeyboardEvent) => {
   if (e.key === "g" || e.key === "G") {
