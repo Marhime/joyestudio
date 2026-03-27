@@ -34,10 +34,13 @@ const _registered = ref(false);
  *   const grid = usePixelGrid()
  *   await grid.fill('var(--color-blue)')   // pixels appear with random stagger
  *   await grid.dissolve()                  // pixels disappear with random stagger
- *   grid.getRows([0, 1])                   // get squares by row for custom timelines
+ *   grid.getRows("random")                   // get squares by row for custom timelines
  */
 export function usePixelGrid() {
-  const { $gsap: gsap } = useNuxtApp();
+  // Lazy accessor — usePixelGrid is a singleton called from non-component contexts
+  // (page transitions), so it can't use useGSAP(). Direct gsap access is correct here
+  // since we only fire one-shot tweens (no MatchMedia / ScrollTrigger cleanup needed).
+  const gsap = useNuxtApp().$gsap as any;
 
   /** Called by PixelGridOverlay.vue on mount to register DOM handles. */
   function register(
@@ -108,7 +111,7 @@ export function usePixelGrid() {
    * Stagger from random for a pixelated wipe-in effect.
    */
   function fill(color: string, opts: FillOptions = {}): Promise<void> {
-    const { duration = 0.3, stagger = 0.3, ease = "power1.inOut" } = opts;
+    const { duration = 0.3, stagger = 1, ease = "expo.in" } = opts;
 
     // If _squares was cleared (e.g. after HMR), re-acquire from DOM
     if (!_squares.value.length) {
@@ -134,7 +137,7 @@ export function usePixelGrid() {
         duration,
         ease,
         overwrite: true,
-        stagger: { from: "random", amount: stagger },
+        stagger: { from: [0, 1], amount: stagger, grid: "auto" },
         onComplete: resolve,
       });
     });
@@ -145,7 +148,7 @@ export function usePixelGrid() {
    * Stagger from random for a pixelated wipe-out effect.
    */
   function dissolve(opts: DissolveOptions = {}): Promise<void> {
-    const { duration = 0.3, stagger = 0.3, ease = "power1.inOut" } = opts;
+    const { duration = 0.3, stagger = 1, ease = "expo.out" } = opts;
 
     // Same DOM fallback as fill() — handles HMR state reset
     if (!_squares.value.length) {
@@ -167,7 +170,7 @@ export function usePixelGrid() {
         duration,
         ease,
         overwrite: true,
-        stagger: { from: "random", amount: stagger },
+        stagger: { from: [1, 0], amount: stagger, grid: "auto" },
         onComplete: () => {
           // Hide the overlay container — grid is invisible until the next transition
           if (_overlay.value) gsap.set(_overlay.value, { autoAlpha: 0 });

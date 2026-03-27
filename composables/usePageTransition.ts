@@ -49,6 +49,8 @@ export type PageEnterHook = (cb: () => void) => void;
  *   })
  */
 export function usePageTransition() {
+  // Singleton composable called from app.vue — not a component setup, so useGSAP()
+  // is not appropriate. Direct nuxtApp access is correct for fire-and-forget ST calls.
   const nuxtApp = useNuxtApp();
   const ScrollTrigger = nuxtApp.$ScrollTrigger as any;
   const { emit } = useAnimationBus();

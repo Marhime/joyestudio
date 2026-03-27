@@ -181,7 +181,7 @@ const heroContentRef = useTemplateRef<HTMLDivElement>("heroContentRef");
 const buttonWrapperRef = useTemplateRef<HTMLDivElement>("buttonWrapperRef");
 
 // ── GSAP ─────────────────────────────────────────────────────────────────────
-const { gsap, mm, BP, scheduleRefresh } = useGSAP();
+const { gsap, Flip, mm, BP, scheduleRefresh } = useGSAP();
 const { $lenis: lenis } = useNuxtApp() as any;
 
 // ── Page enter hook (provided by app.vue via usePageTransition) ────────────────
@@ -240,7 +240,7 @@ onMounted(() => {
         const bg = homeBgGridRef.value;
         if (bg && sectionRef.value) {
           setupHeroGridDissolve(
-            { gsap, mm },
+            { gsap, mm, Flip },
             () => bg.getGridData(),
             sectionRef.value,
           );
@@ -294,7 +294,6 @@ onMounted(() => {
 <style lang="scss" scoped>
 .hero-section {
   position: relative;
-  z-index: 10; // above HomeBgGrid (z:2), below Header (z:100+)
   width: 100%;
   padding-top: 14.8rem;
 
@@ -302,10 +301,6 @@ onMounted(() => {
     padding-top: 23.1vh;
     min-height: 100vh;
   }
-}
-
-.line-hero {
-  z-index: 0;
 }
 
 .home-logo {
@@ -327,7 +322,7 @@ onMounted(() => {
 
   .logo-left {
     position: relative;
-    z-index: 1;
+    z-index: 99;
     width: 85.76%;
     margin: auto;
     @include respond-to("desktop") {
@@ -340,7 +335,7 @@ onMounted(() => {
     position: relative;
     width: 99.12%;
     margin-left: auto;
-    z-index: 4;
+    z-index: 101;
 
     @include respond-to("desktop") {
       width: 46.09%;
@@ -361,7 +356,6 @@ onMounted(() => {
     left: 50%;
     transform: translate(-50%, -100%);
     width: 52.94%;
-    z-index: 10;
     visibility: hidden;
 
     @include respond-to("desktop") {
@@ -383,7 +377,6 @@ onMounted(() => {
   transform: translateX(-50%);
   height: 100%;
   width: 77.29%;
-  z-index: 1;
   padding-right: var(--content-margin);
 
   @include respond-to("desktop") {

@@ -32,14 +32,14 @@ import { useGSAP } from "~/composables/useGSAP";
 // mm     : one matchMedia instance per component, auto-reverts on unmount
 // BP     : breakpoint strings aligned with _mixins.scss
 // scheduleRefresh : debounced ScrollTrigger.refresh() shared across all components
-const { gsap, mm, BP, scheduleRefresh } = useGSAP();
+const { gsap, Flip, mm, BP, scheduleRefresh } = useGSAP();
 
 const {
   init: initFlip,
   setInitialPositions,
   addToTimeline: addFlipToTimeline,
   reset: resetFlip,
-} = useLogoFlip();
+} = useLogoFlip(gsap, Flip);
 
 const gridContainer = ref(null);
 const squareRefs = ref([]);
@@ -94,29 +94,7 @@ const calculateGridSize = () => {
  * Setup event listeners on squares
  * Called after squares are mounted
  */
-const setupEventListeners = () => {
-  // squareRefs.value.forEach((square) => {
-  //   if (!square) return;
-  //   square.addEventListener("click", () => {
-  //     square.classList.add("clicked");
-  //     $gsap.to(square, {
-  //       backgroundColor: "var(--color-white)",
-  //       duration: 0.5,
-  //     });
-  //   });
-  // });
-  // const innerSquares = document.querySelectorAll(".inner-square");
-  // innerSquares.forEach((inner) => {
-  //   inner.addEventListener("click", (e) => {
-  //     e.stopPropagation(); // Prevent click from bubbling to parent square
-  //     inner.classList.add("clicked");
-  //     $gsap.to(inner, {
-  //       backgroundColor: "var(--color-white)",
-  //       duration: 0.5,
-  //     });
-  //   });
-  // });
-};
+const setupEventListeners = () => {};
 
 // get first row of squares
 const getFirstRowSquares = () => {

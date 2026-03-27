@@ -6,8 +6,10 @@
 import { onMounted, onBeforeUnmount, ref } from "vue";
 import * as THREE from "three";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
+import { gsap } from "gsap";
 import modelUrl from "~/assets/3D/smileyV2.glb?url";
 import { domRectToWorld } from "~/utils/domToWorld";
+import { useRAFManager } from "~/composables/useRAFManager";
 
 const props = defineProps({
   color: { type: Number, default: 0xffe15a },
@@ -17,7 +19,7 @@ const props = defineProps({
 
 const container = ref(null);
 
-let renderer, scene, camera, mesh, geometry, frameId, gui;
+let renderer, scene, camera, mesh, geometry, gui;
 const meshes = []; // sphere sub-meshes with shader → shared uniform updates
 let featureMeshes = []; // eyes + mouth → MeshBasicMaterial
 const mouse = new THREE.Vector2(0.5, 0.5);
@@ -35,6 +37,7 @@ let moveSpeed = 0,
 let gsapTickerFn = null;
 let trackedEl = null;
 const isTracking = ref(false);
+const mode = ref("free"); // 'free' | 'tracking'
 // Base world position written by gsapTickerFn each tick
 const trackedBase = { x: 0, y: 0, scale: props.radius };
 
@@ -162,17 +165,16 @@ const resize = () => {
 
 const onContextLost = (e) => {
   e.preventDefault();
-  if (frameId) cancelAnimationFrame(frameId);
-  frameId = null;
+  useRAFManager().unregister("three");
 };
 
 const onContextRestored = () => {
-  animate();
+  useRAFManager().register("three", animate);
 };
 
 // ─── Loop ──────────────────────────────────────────────────────────────────
 const animate = () => {
-  if (renderer.getContext().isContextLost()) return;
+  if (!renderer || renderer.getContext().isContextLost()) return;
   time += 0.016;
 
   if (isTracking.value) {
@@ -274,7 +276,6 @@ const animate = () => {
   mesh.rotation.z += (baseRotZ - mesh.rotation.z) * guiParams.tiltLerp;
 
   renderer.render(scene, camera);
-  frameId = requestAnimationFrame(animate);
 };
 
 // ─── Init ──────────────────────────────────────────────────────────────────
@@ -284,7 +285,7 @@ const init = () => {
   // pixelRatio = 1 → each logical pixel maps to 1 screen pixel
   // → crisp, visible pixel blocks from gl_FragCoord (no sub-pixel blurring)
   renderer = new THREE.WebGLRenderer({ antialias: false, alpha: true });
-  renderer.setPixelRatio(1);
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
   renderer.setClearColor(0x000000, 0); // fully transparent background
 
   container.value.appendChild(renderer.domElement);
@@ -427,8 +428,14 @@ const init = () => {
   //     });
   // });
 
-  animate();
+  useRAFManager().register("three", animate);
 };
+
+// ─── Reduced motion: skip init entirely ────────────────────────────────────
+const prefersReducedMotion =
+  typeof window !== "undefined"
+    ? window.matchMedia("(prefers-reduced-motion: reduce)")
+    : { matches: false };
 
 // ─── Public API ────────────────────────────────────────────────────────────
 
@@ -439,12 +446,11 @@ const init = () => {
  * Parfait pour piloter depuis une anim GSAP / ScrollTrigger.
  */
 const startTracking = (el) => {
-  const { $gsap } = useNuxtApp();
-
   stopTracking(); // retire un éventuel ticker précédent
 
   trackedEl = el;
   isTracking.value = true;
+  mode.value = "tracking";
 
   gsapTickerFn = () => {
     if (!camera || !mesh || !renderer || !trackedEl) return;
@@ -461,7 +467,7 @@ const startTracking = (el) => {
     trackedBase.scale = (worldSize / 2) * guiParams.trackingScale;
   };
 
-  $gsap.ticker.add(gsapTickerFn);
+  gsap.ticker.add(gsapTickerFn);
 };
 
 /**
@@ -469,20 +475,28 @@ const startTracking = (el) => {
  */
 const stopTracking = () => {
   if (!gsapTickerFn) return;
-  const { $gsap } = useNuxtApp();
-  $gsap.ticker.remove(gsapTickerFn);
+  gsap.ticker.remove(gsapTickerFn);
   gsapTickerFn = null;
   trackedEl = null;
   isTracking.value = false;
+  mode.value = "free";
 };
 
-defineExpose({ startTracking, stopTracking, isTracking });
+// SmileyAPI-compatible aliases — used by useSmiley() composable
+// startTracking / stopTracking kept for backward compat (About.vue uses them directly)
+const track = startTracking;
+const release = stopTracking;
 
-onMounted(init);
+defineExpose({ startTracking, stopTracking, isTracking, track, release, mode });
+
+onMounted(() => {
+  if (prefersReducedMotion.matches) return; // skip Three.js entirely
+  init();
+});
 
 onBeforeUnmount(() => {
+  useRAFManager().unregister("three");
   stopTracking();
-  if (frameId) cancelAnimationFrame(frameId);
   gui?.destroy();
   window.removeEventListener("resize", resize);
   window.removeEventListener("pointermove", onPointerMove);
@@ -507,6 +521,6 @@ onBeforeUnmount(() => {
   width: 100vw;
   height: 100vh;
   pointer-events: none; /* laisse passer les clics au contenu en dessous */
-  z-index: 3000; /* au-dessus de tout sauf les éléments UI importants */
+  z-index: 100; /* au-dessus de tout sauf les éléments UI importants */
 }
 </style>

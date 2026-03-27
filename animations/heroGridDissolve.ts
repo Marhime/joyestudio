@@ -22,11 +22,11 @@ interface GridData {
  *   setupHeroGridDissolve({ gsap, mm }, () => homeBgGridRef.value?.getGridData() ?? null, sectionRef.value!)
  */
 export function setupHeroGridDissolve(
-  context: { gsap: any; mm: any },
+  context: { gsap: any; mm: any; Flip: any },
   getGridData: () => GridData | null,
   heroSection: HTMLElement,
 ) {
-  const { gsap, mm } = context;
+  const { gsap, mm, Flip } = context;
   const { emit } = useAnimationBus();
 
   const {
@@ -34,7 +34,7 @@ export function setupHeroGridDissolve(
     setInitialPositions,
     addToTimeline: addFlipToTimeline,
     reset: resetFlip,
-  } = useLogoFlip();
+  } = useLogoFlip(gsap, Flip);
 
   // ScrollTrigger scrubs from hero top reaching viewport top → hero 50% reaching top
   const stConfig = {

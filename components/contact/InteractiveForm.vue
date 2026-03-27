@@ -502,6 +502,10 @@ onMounted(() => {
 // Called by the parent page (contact.vue) from its onPageEnter callback,
 // so the typewriter starts in sync with the form container fading in.
 const start = () => {
+  const anchor = document.querySelector(
+    "[contact-smiley-anchor]",
+  ) as HTMLElement | null;
+  if (anchor) smiley.track(anchor);
   if (!window.matchMedia(BP.reducedMotion).matches) {
     activateStep(1);
   }

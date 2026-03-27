@@ -1,8 +1,11 @@
-export function useLogoFlip() {
-  // useNuxtApp() instead of useGSAP() — this function is called from onMounted
-  // (not from setup()), so lifecycle hooks must not be registered here.
-  const { $gsap: gsap, $Flip: Flip } = useNuxtApp();
-
+/**
+ * Flip animation: hero logos → header logos during scroll.
+ *
+ * Called from inside mm.add() callbacks (not from setup()),
+ * so it cannot register its own lifecycle hooks.
+ * Callers pass the gsap/Flip instances from useGSAP().
+ */
+export function useLogoFlip(gsap: any, Flip: any) {
   let logoLeftRef: Element | null = null;
   let logoRightRef: Element | null = null;
   let finalLeftContainer: Element | null = null;

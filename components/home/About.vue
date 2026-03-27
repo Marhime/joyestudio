@@ -49,95 +49,102 @@
 <script setup>
 import RightArrow from "../icons/RightArrow.vue";
 
-const { $gsap, $Flip } = useNuxtApp();
+const { gsap, Flip, mm, BP, scheduleRefresh } = useGSAP();
 
-const sectionRef = ref(null);
+const sectionRef = useTemplateRef("sectionRef");
 
 // Sphère 3D fournie par le layout default via provide/inject
 const pixelBlob = inject("pixelBlob");
 
-let ctx;
+let resizeHandler;
+
+const setupAnimations = () => {
+  mm.revert();
+
+  mm.add(BP.desktop, () => {
+    const hiyeFace = document.querySelector("[hiye-face]");
+    const finalLeftContainer = document.querySelector(
+      "[hiye-face-placeholder]",
+    );
+    if (!hiyeFace || !finalLeftContainer || !sectionRef.value) return;
+
+    const finalState = Flip.getState(finalLeftContainer);
+
+    const tlFlip = gsap.timeline({
+      scrollTrigger: {
+        trigger: sectionRef.value,
+        start: "top bottom",
+        end: "top top",
+        scrub: 1,
+        invalidateOnRefresh: true,
+      },
+    });
+
+    tlFlip.add(
+      Flip.fit(hiyeFace, finalState, { ease: "none", duration: 1 }),
+      0,
+    );
+
+    return () => {};
+  });
+
+  mm.add(BP.mobile, () => {
+    const hiyeFace = document.querySelector("[hiye-face]");
+    const finalLeftContainer = document.querySelector(
+      "[hiye-face-placeholder]",
+    );
+    if (!hiyeFace || !finalLeftContainer || !sectionRef.value) return;
+
+    const finalState = Flip.getState(finalLeftContainer);
+
+    const tlFlip = gsap.timeline({
+      scrollTrigger: {
+        trigger: sectionRef.value,
+        start: "top bottom",
+        end: "top top",
+        scrub: 1,
+        invalidateOnRefresh: true,
+      },
+    });
+
+    tlFlip.add(
+      Flip.fit(hiyeFace, finalState, { ease: "none", duration: 1 }),
+      0,
+    );
+
+    return () => {};
+  });
+
+  mm.add(BP.reducedMotion, () => {
+    gsap.set("[hiye-face]", { clearProps: "all" });
+    return () => {};
+  });
+
+  scheduleRefresh();
+};
 
 onMounted(() => {
-  const hiyeFace = document.querySelector("[hiye-face]");
-  const finalLeftContainer = document.querySelector("[hiye-face-placeholder]");
-
-  let initialState;
-  let finalState;
-
-  const updatePositions = () => {
-    initialState = finalLeftContainer?.getBoundingClientRect();
-  };
-
-  const createFlipAnimation = () => {
-    // revalidate positions
-    ctx?.revert();
-
-    // set fixed when the context is active (avoids layout shifts before context)
-    ctx = $gsap.context(() => {
-      updatePositions();
-      finalState = $Flip.getState(finalLeftContainer);
-
-      const tlFlip = $gsap.timeline({
-        scrollTrigger: {
-          trigger: sectionRef.value,
-          start: "top bottom",
-          end: "top top",
-          scrub: 1,
-          invalidateOnRefresh: true,
-        },
-      });
-
-      const flipConfig = {
-        ease: "none",
-        duration: 1,
-      };
-
-      tlFlip.add($Flip.fit(hiyeFace, finalState, flipConfig), 0);
-
-      const tlContent = $gsap.timeline({
-        scrollTrigger: {
-          trigger: sectionRef.value,
-          start: "40% bottom",
-          end: "70% bottom",
-          scrub: 1,
-          invalidateOnRefresh: true,
-          // markers: true,
-        },
-      });
-
-      // tlContent.from(".about__content-line span", {
-      //   yPercent: 200,
-      //   ease: "power2.in",
-      // });
-    });
-  };
-
-  const debouncedCreateFlipAnimation = debounce(() => {
-    createFlipAnimation();
-  }, 200);
-
   nextTick(() => {
-    createFlipAnimation();
+    setupAnimations();
 
     // Tracking temps réel — la sphère 3D suit l'élément hiye-face
-    // pixel-perfect via gsap.ticker (appelé depuis l'anim GSAP)
     const hiyeFaceEl = document.querySelector("[hiye-face]");
     if (hiyeFaceEl) {
       pixelBlob?.value?.startTracking(hiyeFaceEl);
     }
   });
 
-  window.addEventListener("resize", () => {
-    debouncedCreateFlipAnimation();
-    // Re-démarre le tracking après recalcul layout (relit le bon rect)
+  resizeHandler = debounce(() => {
+    setupAnimations();
     const hiyeFaceEl = document.querySelector("[hiye-face]");
     if (hiyeFaceEl) pixelBlob?.value?.startTracking(hiyeFaceEl);
-  });
+  }, 200);
+
+  window.addEventListener("resize", resizeHandler);
 });
 
 onUnmounted(() => {
-  ctx?.revert();
+  if (resizeHandler) window.removeEventListener("resize", resizeHandler);
 });
 </script>
 

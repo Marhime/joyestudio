@@ -41,7 +41,6 @@ onUnmounted(() => {
   /* overflow-x: hidden; */
   width: 100vw;
   position: relative;
-  z-index: 10;
   background-color: var(--color-white);
 }
 

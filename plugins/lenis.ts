@@ -1,13 +1,14 @@
 import Lenis from "lenis";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
 import { defineNuxtPlugin } from "nuxt/app";
+import { useRAFManager } from "~/composables/useRAFManager";
 
 export default defineNuxtPlugin((nuxtApp) => {
   if (!import.meta.client) return;
 
+  const rafManager = useRAFManager();
+
   // Create a Lenis instance for smooth scrolling
-  // Cast to any to avoid typings mismatch between Lenis versions
-  // (we only use the runtime API here)
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const lenis: any = new Lenis({
     smooth: true,
@@ -17,15 +18,11 @@ export default defineNuxtPlugin((nuxtApp) => {
   } as any);
 
   // Integrate Lenis with ScrollTrigger via scrollerProxy
-  // Use the window/document scrolling as the scroller target
   ScrollTrigger.scrollerProxy(window, {
-    // `value` can be undefined when used as getter
     scrollTop(value?: number) {
       if (arguments.length && typeof value === "number") {
-        // set scroll position via Lenis
         lenis.scrollTo(value);
       }
-      // return page scroll position
       return window.scrollY;
     },
     getBoundingClientRect() {
@@ -36,19 +33,14 @@ export default defineNuxtPlugin((nuxtApp) => {
         height: window.innerHeight,
       };
     },
-    // determine pin type based on transform support
     pinType: document.body.style.transform ? "transform" : "fixed",
   });
 
-  // RAF loop for Lenis; keep ScrollTrigger in sync
-  const raf = (time: number) => {
+  // Register Lenis in the unified RAF loop
+  rafManager.register("lenis", (time: number) => {
     lenis.raf(time);
-    // keep ScrollTrigger updated
     ScrollTrigger.update();
-    requestAnimationFrame(raf);
-  };
-
-  requestAnimationFrame(raf);
+  });
 
   return {
     provide: { lenis },

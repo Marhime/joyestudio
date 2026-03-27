@@ -8,6 +8,7 @@
           >ther!
         </h1>
       </div>
+      <div contact-smiley-anchor class="contact-smiley-anchor"></div>
     </div>
     <div ref="formRef">
       <InteractiveForm ref="interactiveFormRef" />
@@ -115,6 +116,10 @@ definePageMeta({
   }
 }
 
+.contact-smiley-anchor {
+  display: none;
+}
+
 @include respond-to("desktop") {
   .contact-page {
     padding-top: 15.6rem;
@@ -134,6 +139,13 @@ definePageMeta({
         font-size: 12.4rem;
         line-height: 0.65;
       }
+    }
+
+    .contact-smiley-anchor {
+      display: block;
+      grid-column: 9 / 13;
+      align-self: start;
+      height: 10rem;
     }
   }
 }

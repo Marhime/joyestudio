@@ -118,107 +118,108 @@
 </template>
 
 <script setup>
-const { $gsap } = useNuxtApp();
-const sectionRef = ref(null);
-let ctx;
+const { gsap, mm, BP, scheduleRefresh } = useGSAP();
+const sectionRef = useTemplateRef("sectionRef");
 let resizeHandler;
 
-onMounted(() => {
-  const createPinAnimation = () => {
-    ctx?.revert();
+const setupAnimations = () => {
+  mm.revert();
 
-    ctx = $gsap.context(() => {
-      const services = $gsap.utils.toArray(".service", sectionRef.value);
+  mm.add(BP.desktop, () => {
+    const services = gsap.utils.toArray(".service", sectionRef.value);
+    if (!services.length) return;
 
-      // Measure each card's header height (title row + paddingTop)
-      const headerHeights = services.map(
-        (s) =>
-          s.querySelector(".grid-template").offsetHeight +
-          parseFloat(getComputedStyle(s).paddingTop),
-      );
+    const headerHeights = services.map(
+      (s) =>
+        s.querySelector(".grid-template").offsetHeight +
+        parseFloat(getComputedStyle(s).paddingTop),
+    );
 
-      const titleContainer = sectionRef.value.querySelector(
-        ".services__title-container",
-      );
-      const servicesWrapper = sectionRef.value.querySelector(".services");
+    const titleContainer = sectionRef.value.querySelector(
+      ".services__title-container",
+    );
+    const servicesWrapper = sectionRef.value.querySelector(".services");
 
-      // build a sequential timeline: each card slides up to its stacked position
-      const tl = $gsap.timeline({
-        defaults: { ease: "none", duration: 1 },
-        scrollTrigger: {
-          trigger: sectionRef.value,
-          start: "top top",
-          end: () => `+=${cardHeight * 2}`,
-          pin: true,
-          scrub: 1,
-          invalidateOnRefresh: true,
-          // pinSpacing: false,
-        },
-      });
+    const cardHeight = window.innerHeight - headerHeights[0] * 2;
 
-      const cardHeight = window.innerHeight - headerHeights[0] * 2; // assuming all cards have the same height
-
-      services.forEach((service, i) => {
-        // sum of header heights of all cards above this one
-        const cumulativeHeaders = headerHeights
-          .slice(0, i)
-          .reduce((acc, h) => acc + h, 0);
-
-        $gsap.set(service, { height: cardHeight });
-
-        if (i === 0) {
-          tl.to(servicesWrapper, {
-            y: () => -titleContainer.offsetHeight,
-          });
-          tl.to(
-            titleContainer,
-            {
-              y: () => -titleContainer.offsetHeight,
-            },
-            "<",
-          );
-          return;
-        } // first card stays fixed at top
-
-        if (i === 1) {
-          // card 2 slides up sequentially after the title block
-          tl.to(
-            service,
-            {
-              yPercent: () => -100 + (cumulativeHeaders / cardHeight) * 100,
-            },
-            "<",
-          );
-          return;
-        }
-
-        if (i === 2) {
-          // card 3 starts before card 2 finishes → overlap effect
-          tl.to(
-            service,
-            {
-              yPercent: () => -200 + (cumulativeHeaders / cardHeight) * 100,
-            },
-            "<+0.4", // start 0.5s before previous animation ends
-          );
-
-          return;
-        }
-      });
+    const tl = gsap.timeline({
+      defaults: { ease: "none", duration: 1 },
+      scrollTrigger: {
+        trigger: sectionRef.value,
+        start: "top top",
+        end: () => `+=${cardHeight * 2}`,
+        pin: true,
+        scrub: 1,
+        invalidateOnRefresh: true,
+      },
     });
-  };
 
-  const debouncedCreatePinAnimation = debounce(createPinAnimation, 200);
+    services.forEach((service, i) => {
+      const cumulativeHeaders = headerHeights
+        .slice(0, i)
+        .reduce((acc, h) => acc + h, 0);
 
-  nextTick(createPinAnimation);
+      gsap.set(service, { height: cardHeight });
 
-  resizeHandler = () => debouncedCreatePinAnimation();
+      if (i === 0) {
+        tl.to(servicesWrapper, {
+          y: () => -titleContainer.offsetHeight,
+        });
+        tl.to(titleContainer, { y: () => -titleContainer.offsetHeight }, "<");
+        return;
+      }
+
+      if (i === 1) {
+        tl.to(
+          service,
+          { yPercent: () => -100 + (cumulativeHeaders / cardHeight) * 100 },
+          "<",
+        );
+        return;
+      }
+
+      if (i === 2) {
+        tl.to(
+          service,
+          { yPercent: () => -200 + (cumulativeHeaders / cardHeight) * 100 },
+          "<+0.4",
+        );
+        return;
+      }
+    });
+
+    return () => {};
+  });
+
+  mm.add(BP.mobile, () => {
+    // On mobile, disable the pin and let cards stack naturally
+    const services = gsap.utils.toArray(".service", sectionRef.value);
+    services.forEach((service) => {
+      gsap.set(service, { clearProps: "height,yPercent" });
+    });
+    return () => {};
+  });
+
+  mm.add(BP.reducedMotion, () => {
+    const services = gsap.utils.toArray(".service", sectionRef.value);
+    services.forEach((service) => {
+      gsap.set(service, { clearProps: "all" });
+    });
+    return () => {};
+  });
+
+  scheduleRefresh();
+};
+
+onMounted(() => {
+  nextTick(setupAnimations);
+
+  resizeHandler = debounce(setupAnimations, 200);
   window.addEventListener("resize", resizeHandler);
 });
 
 onUnmounted(() => {
-  ctx?.revert();
-  window.removeEventListener("resize", resizeHandler);
+  if (resizeHandler) window.removeEventListener("resize", resizeHandler);
 });
 </script>
 

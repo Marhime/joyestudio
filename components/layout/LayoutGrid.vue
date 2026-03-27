@@ -7,21 +7,21 @@
 <script setup>
 import { debounce } from "~/utils/debounce";
 
-const { $gsap } = useNuxtApp();
+const { gsap } = useGSAP();
 
-const canvas = ref(null);
+const canvas = useTemplateRef("canvas");
 const ctx = ref(null);
 const gridData = ref({
   cols: 11,
   rows: 0,
   squareSize: 0,
-  squares: [], // Array of square objects with opacity for animations
+  squares: [],
 });
 
-// Configuration responsive
+// Configuration responsive — matches BP.desktop (901px)
 const DESKTOP_COLS = 11;
 const MOBILE_COLS = 6;
-const MOBILE_BREAKPOINT = 768;
+const MOBILE_BREAKPOINT = 901;
 
 /**
  * Initialize canvas and setup grid
@@ -149,12 +149,12 @@ const handleCanvasClick = (event) => {
 
   if (square) {
     // Animate with GSAP
-    $gsap.to(square, {
+    gsap.to(square, {
       opacity: 0,
       duration: 0.5,
       onUpdate: draw,
       onComplete: () => {
-        $gsap.set(square, { opacity: 1 });
+        gsap.set(square, { opacity: 1 });
         draw();
       },
     });

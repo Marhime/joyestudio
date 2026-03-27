@@ -92,46 +92,6 @@
 
 <script setup>
 defineProps(["href", "label", "labelSecondary", "target"]);
-
-// const { $gsap } = useNuxtApp();
-// const themeStore = useThemeStore();
-// const { currentTheme } = storeToRefs(themeStore);
-
-// const linkRef = ref(null);
-// const innerRef = ref(null);
-// const outerRef = ref(null);
-
-// const changeTheme = () => {
-//   if (!innerRef.value || !outerRef.value) return;
-
-//   console.log("animate");
-
-//   // Annuler l'animation précédente si elle existe
-//   changeColorCtx?.revert();
-
-//   changeColorCtx = $gsap.context(() => {
-//     const tl = $gsap.timeline({ defaults: { duration: 0.5 } });
-//     tl.to(innerRef.value, {
-//       yPercent: -120,
-//       ease: "power3.inOut",
-//     }).to(
-//       outerRef.value,
-//       {
-//         yPercent: 0,
-//         ease: "power3.inOut",
-//       },
-//       "<"
-//     );
-//   }, linkRef.value); // Scope GSAP à ce composant uniquement
-// };
-
-// watch(currentTheme, () => {
-//   changeTheme();
-// });
-
-// onBeforeUnmount(() => {
-//   changeColorCtx?.revert();
-// });
 </script>
 
 <style lang="scss">

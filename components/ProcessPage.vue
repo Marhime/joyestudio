@@ -104,39 +104,34 @@
 </template>
 
 <script lang="ts" setup>
-const { $gsap } = useNuxtApp();
+const { gsap, mm, BP, scheduleRefresh } = useGSAP();
 const processRefs = ref<(HTMLElement | null)[]>([]);
 const progressRef = ref<number | null>(null);
 const infoBarRef = ref<HTMLElement | null>(null);
 const stepWrapperRef = ref<HTMLElement | null>(null);
 
+let processPageHandler: ((event: any) => void) | null = null;
+let infoBarHandler: ((event: any) => void) | null = null;
+
 onMounted(() => {
-  processRefs.value = $gsap.utils.toArray([
+  processRefs.value = gsap.utils.toArray([
     "[data-process-panel]",
   ]) as HTMLElement[];
   const reversedRefs = [...processRefs.value].reverse();
-  const stepNames = $gsap.utils.toArray(".step-name") as HTMLElement[];
-  const stepCounters = $gsap.utils
+  const stepNames = gsap.utils.toArray(".step-name") as HTMLElement[];
+  const stepCounters = gsap.utils
     .toArray(".counter")
     .reverse() as HTMLElement[];
 
   // Créer un tableau des largeurs pour chaque étape
   const stepWidths = stepNames.map((el) => el.offsetWidth);
 
-  // Initialiser la largeur du placeholder avec la première étape
-  // $gsap.set(".name-placeholder", {
-  //   width: `${stepWidths[0]}px`,
-  // });
-
-  $gsap.set(stepNames.slice(1), {
+  gsap.set(stepNames.slice(1), {
     yPercent: 100,
   });
-  // $gsap.set(stepCounters.slice(1), {
-  //   xPercent: -100,
-  // });
 
-  const tlPanels = $gsap.timeline({ paused: true, duration: 1 });
-  const tlBullets = $gsap.timeline({ paused: true, duration: 1 });
+  const tlPanels = gsap.timeline({ paused: true, duration: 1 });
+  const tlBullets = gsap.timeline({ paused: true, duration: 1 });
 
   stepNames.forEach((el, index) => {
     const currentIndex = index;
@@ -156,7 +151,7 @@ onMounted(() => {
             duration: 0.25,
             ease: "power4.inOut",
           },
-          0.25 * index
+          0.25 * index,
         )
         .to(
           `.step-name--${nextIndex}`,
@@ -165,7 +160,7 @@ onMounted(() => {
             duration: 0.25,
             ease: "power4.inOut",
           },
-          "<"
+          "<",
         );
     }
     if (index === stepCounters.length - 1) {
@@ -179,7 +174,7 @@ onMounted(() => {
           xPercent: 0,
           duration: 0.125,
         },
-        0.75
+        0.75,
       );
     }
   });
@@ -210,7 +205,7 @@ onMounted(() => {
           duration: 0.33,
           ease: "power4.inOut",
         },
-        0
+        0,
       );
     }
     if (index === 1) {
@@ -224,7 +219,7 @@ onMounted(() => {
           },
           duration: 0.33,
         },
-        0.25
+        0.25,
       );
     }
     if (index === 2) {
@@ -238,7 +233,7 @@ onMounted(() => {
           },
           duration: 0.33,
         },
-        0.5
+        0.5,
       );
     }
     if (index === reversedRefs.length - 1) {
@@ -252,15 +247,16 @@ onMounted(() => {
           yPercent: -250,
           duration: 0.165,
         },
-        0.75
+        0.75,
       );
     }
   });
 
-  window.addEventListener("ProcessPageEvent", (event: any) => {
+  processPageHandler = (event: any) => {
     const { progress } = event.detail;
     tlPanels.progress(progress);
-  });
+  };
+  window.addEventListener("ProcessPageEvent", processPageHandler);
 
   let previousProgress = 0;
 
@@ -280,7 +276,7 @@ onMounted(() => {
     }
   }
 
-  window.addEventListener("InfoBarEvent", (event) => {
+  infoBarHandler = (event: any) => {
     const { progress } = event.detail;
     const isScrollingDown = progress > previousProgress;
 
@@ -291,37 +287,34 @@ onMounted(() => {
 
         // action
         stepStates.step1 = true;
-        console.log("🎯 ACTION Step 1 - UNE SEULE FOIS!");
       }
     } else if (progress >= 0.5 && progress < 0.75) {
       resetStepStates("step2");
       // action
       stepStates.step2 = true;
-      console.log("🎯 ACTION Step 2 - UNE SEULE FOIS!");
     } else if (progress >= 0.75 && progress < 0.865) {
       resetStepStates("step3");
 
       // action
       stepStates.step3 = true;
-      console.log("🎯 ACTION Step 3 - UNE SEULE FOIS!");
     } else if (progress >= 0.865) {
       resetStepStates("step4");
 
       // action
       stepStates.step4 = true;
-      console.log("🎯 ACTION Step 4 - UNE SEULE FOIS!");
     }
-
-    // Répéter pour les autres steps...
 
     tlBullets.progress(progress);
     previousProgress = progress;
-  });
+  };
+  window.addEventListener("InfoBarEvent", infoBarHandler);
 });
 
 onUnmounted(() => {
-  window.removeEventListener("ProcessPageEvent", () => {});
-  window.removeEventListener("InfoBarEvent", () => {});
+  if (processPageHandler)
+    window.removeEventListener("ProcessPageEvent", processPageHandler);
+  if (infoBarHandler)
+    window.removeEventListener("InfoBarEvent", infoBarHandler);
 });
 </script>
 

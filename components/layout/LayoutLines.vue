@@ -21,7 +21,9 @@ const props = withDefaults(
   { color: "white" },
 );
 
-const lineColor = computed(() => (props.color === "black" ? "black" : "white"));
+const lineColor = computed(() =>
+  props.color === "black" ? "#C5CDCF" : "#F9F9F9",
+);
 </script>
 
 <style lang="scss" scoped>

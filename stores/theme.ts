@@ -49,31 +49,24 @@ export const useThemeStore = defineStore("theme", () => {
     document.body.classList.add(currentTheme.value);
 
     const rootElement = document.documentElement;
-    // Set the new value for the CSS variable '--primary-color'
     rootElement.style.setProperty("--theme-color", getColor(themeName).color);
     rootElement.style.setProperty(
       "--button-bg",
-      getColor(themeName).buttonBgColor
+      getColor(themeName).buttonBgColor,
     );
     rootElement.style.setProperty(
       "--button-text",
-      getColor(themeName).buttonTextColor
+      getColor(themeName).buttonTextColor,
     );
     rootElement.style.setProperty(
       "--button-icon",
-      getColor(themeName).buttonIconColor
+      getColor(themeName).buttonIconColor,
     );
     rootElement.style.setProperty(
       "--grid-color",
-      getColor(themeName).gridColor
+      getColor(themeName).gridColor,
     );
-
-    console.log(themeName);
   };
-
-  onMounted(() => {
-    console.log("Mounted! useThemeStore ✨");
-  });
 
   watch(showLogo, () => {
     if (showLogo.value) document.body.classList.add("show-logo");
