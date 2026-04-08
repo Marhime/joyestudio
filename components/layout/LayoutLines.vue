@@ -111,7 +111,7 @@ const lineColor = computed(() =>
 
 .layout-lines__col,
 .col-a {
-  opacity: 0.15;
+  opacity: 0.35;
 }
 
 @include respond-to("desktop") {

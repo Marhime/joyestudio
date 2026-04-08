@@ -8,26 +8,35 @@
       </div>
       <div class="about__wrapper">
         <h3 class="about__content t1-h2">
-          <span class="about__content-line about__content-line--1">
-            <span>At </span>
-            <span class="font-italic font-como t2-h2">Joyestudio, </span>
-            <span>we</span></span
-          >
-          <span class="about__content-line about__content-line--2"
-            >believe every brand</span
-          >
-          <span class="about__content-line about__content-line--3">
-            <span>deserves </span
-            ><span hiye-face-placeholder class="face-placeholder"></span
-            ><span>a digital</span>
+          <span class="line-container about__content-line--1">
+            <span class="about__content-line">
+              <span>At </span>
+              <span class="font-italic font-como t2-h2">Joyestudio, </span>
+              <span>we</span></span
+            >
           </span>
-          <span class="icon"><RightArrow /></span
-          ><span class="about__content-line--4">presence that feels</span>
-          <span
-            class="about__content-line about__content-line--5 font-italic font-como t2-h2"
-            ><span class="icon-mobile"><RightArrow /></span>
-            <span>as good as it looks</span></span
-          >
+          <span class="line-container about__content-line--2">
+            <span class="about__content-line">believe every brand</span>
+          </span>
+          <span class="line-container about__content-line--3">
+            <span class="about__content-line">
+              <span>deserves </span
+              ><span hiye-face-placeholder class="face-placeholder"></span
+              ><span>a digital</span>
+            </span>
+          </span>
+          <span class="icon"
+            ><span class="right-arrow"> <RightArrow /></span
+          ></span>
+          <span class="line-container about__content-line--4">
+            <span class="about__content-line">presence that feels</span>
+          </span>
+          <span class="line-container about__content-line--5">
+            <span class="about__content-line font-italic font-como t2-h2"
+              ><span class="icon-mobile"><RightArrow /></span>
+              <span>as good as it looks</span></span
+            >
+          </span>
         </h3>
       </div>
       <div class="text-container">
@@ -49,7 +58,7 @@
 <script setup>
 import RightArrow from "../icons/RightArrow.vue";
 
-const { gsap, Flip, mm, BP, scheduleRefresh } = useGSAP();
+const { gsap, Flip, SplitText, mm, BP, scheduleRefresh } = useGSAP();
 
 const sectionRef = useTemplateRef("sectionRef");
 
@@ -85,6 +94,87 @@ const setupAnimations = () => {
       0,
     );
 
+    const title = sectionRef.value.querySelectorAll(".about__title h2 span");
+    const titleSplit = new SplitText(title, { type: "lines", mask: "lines" });
+    gsap.set(titleSplit.lines, {
+      padding: "0.25em 0.06em",
+      margin: "-0.25em -0.06em",
+    });
+    gsap.set(titleSplit.lines, { yPercent: 100 });
+    gsap.to(titleSplit.lines, {
+      yPercent: 0,
+      duration: 0.9,
+      ease: "power3.out",
+      stagger: 0.1,
+      scrollTrigger: {
+        trigger: title[0],
+        start: "top 50%",
+        invalidateOnRefresh: true,
+        markers: true,
+      },
+    });
+
+    // Build animation targets in DOM order so stagger is sequential.
+    // Line-3 excluded from SplitText (wrappers break its flex layout).
+    // Icon is a sibling between line-3 and line-4 — iterated via parent children.
+    const splits = [];
+    const allTargets = [];
+    const contentEl = sectionRef.value.querySelector(".about__content");
+
+    for (const child of contentEl.children) {
+      // Arrow icon between line-3 and line-4
+      if (child.classList.contains("icon")) {
+        const arrow = child.querySelector(".right-arrow");
+        if (arrow) allTargets.push(arrow);
+        continue;
+      }
+      const line = child.querySelector(".about__content-line");
+      if (!line) continue;
+
+      if (child.classList.contains("about__content-line--3")) {
+        // Line-3: animate as a whole block (SplitText breaks its flex layout)
+        allTargets.push(line);
+      } else {
+        const split = new SplitText(line, { type: "words", mask: "words" });
+        splits.push(split);
+        allTargets.push(...split.words);
+      }
+    }
+
+    // Pad mask wrappers so italic ascenders/descenders aren't clipped
+    const allMasks = splits.flatMap((s) => s.masks || []);
+    gsap.set(allMasks, { padding: "0.25em 0.06em", margin: "-0.25em -0.06em" });
+
+    gsap.set(allTargets, { yPercent: 132 });
+    gsap.to(allTargets, {
+      yPercent: 0,
+      duration: 0.9,
+      ease: "power3.out",
+      stagger: 0.03,
+      scrollTrigger: {
+        trigger: sectionRef.value,
+        start: "50% 75%",
+        invalidateOnRefresh: true,
+      },
+    });
+
+    const textWrapper = sectionRef.value.querySelector(".text-wrapper p");
+    const splitText = new SplitText(textWrapper, {
+      type: "lines",
+      mask: "lines",
+    });
+    gsap.set(splitText.lines, { yPercent: 100 });
+    gsap.to(splitText.lines, {
+      yPercent: 0,
+      duration: 0.9,
+      ease: "power3.out",
+      stagger: 0.1,
+      scrollTrigger: {
+        trigger: textWrapper,
+        start: "top 75%",
+        invalidateOnRefresh: true,
+      },
+    });
     return () => {};
   });
 
@@ -112,11 +202,56 @@ const setupAnimations = () => {
       0,
     );
 
+    // Same approach as desktop — iterate .about__content children in DOM order.
+    const splits = [];
+    const allTargets = [];
+    const contentEl = sectionRef.value.querySelector(".about__content");
+
+    for (const child of contentEl.children) {
+      if (child.classList.contains("icon")) {
+        const arrow = child.querySelector(".right-arrow");
+        if (arrow) allTargets.push(arrow);
+        continue;
+      }
+
+      const line = child.querySelector(".about__content-line");
+      if (!line) continue;
+
+      if (child.classList.contains("about__content-line--3")) {
+        allTargets.push(line);
+      } else {
+        const split = new SplitText(line, { type: "words", mask: "words" });
+        splits.push(split);
+        allTargets.push(...split.words);
+      }
+    }
+
+    const allMasks = splits.flatMap((s) => s.masks || []);
+    gsap.set(allMasks, { padding: "0.25em 0.06em", margin: "-0.25em -0.06em" });
+
+    gsap.set(allTargets, { yPercent: 110 });
+    gsap.to(allTargets, {
+      yPercent: 0,
+      duration: 0.8,
+      ease: "power3.out",
+      stagger: 0.02,
+      scrollTrigger: {
+        trigger: sectionRef.value,
+        start: "50% 80%",
+        invalidateOnRefresh: true,
+      },
+    });
+
     return () => {};
   });
 
   mm.add(BP.reducedMotion, () => {
     gsap.set("[hiye-face]", { clearProps: "all" });
+    if (sectionRef.value) {
+      gsap.set(sectionRef.value.querySelectorAll(".about__content-line"), {
+        clearProps: "all",
+      });
+    }
     return () => {};
   });
 
@@ -158,6 +293,7 @@ onUnmounted(() => {
   }
   &__wrapper {
     .face-placeholder {
+      display: inline-block;
       width: 6rem;
       @include respond-to("desktop") {
         width: 13rem;
@@ -167,6 +303,7 @@ onUnmounted(() => {
 
     .icon {
       display: none;
+      overflow: hidden;
       svg {
         width: 100%;
         height: auto;
@@ -176,9 +313,13 @@ onUnmounted(() => {
       @include respond-to("desktop") {
         display: block;
         align-self: flex-end;
-        width: 12.5rem;
         grid-column-start: 3;
         grid-column-end: 4;
+      }
+
+      .right-arrow {
+        display: block;
+        width: 12.5rem;
       }
     }
   }
@@ -187,7 +328,7 @@ onUnmounted(() => {
     @include grid;
     margin-bottom: 2.4rem;
 
-    p {
+    h2 {
       display: flex;
       flex-direction: column;
       grid-column-start: 2;
@@ -215,7 +356,13 @@ onUnmounted(() => {
       line-height: 0.8;
     }
 
+    .line-container {
+      display: block;
+    }
+
     &-line {
+      display: block;
+
       line-height: 1;
       &--1 {
         grid-column-start: 4;
@@ -230,6 +377,8 @@ onUnmounted(() => {
         grid-column-end: -1;
         display: flex;
         gap: 0.5rem;
+        // Mask for the whole-line yPercent animation (no SplitText on this line)
+        clip-path: inset(-5% 0 -5% 0);
       }
       &--4 {
         grid-column-start: 2;

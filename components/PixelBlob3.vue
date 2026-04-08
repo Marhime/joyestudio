@@ -10,6 +10,7 @@ import { gsap } from "gsap";
 import modelUrl from "~/assets/3D/smileyV2.glb?url";
 import { domRectToWorld } from "~/utils/domToWorld";
 import { useRAFManager } from "~/composables/useRAFManager";
+import { debounce } from "~/utils/debounce";
 
 const props = defineProps({
   color: { type: Number, default: 0xffe15a },
@@ -33,8 +34,7 @@ let moveSpeed = 0,
   trailStrength = 0;
 
 // ─── Dom-tracking state ──────────────────────────────────────────────────
-// gsap.ticker cb → reads getBoundingClientRect every frame, stores base pos
-let gsapTickerFn = null;
+// Position read inside animate() — no separate gsap.ticker callback
 let trackedEl = null;
 const isTracking = ref(false);
 const mode = ref("free"); // 'free' | 'tracking'
@@ -162,6 +162,7 @@ const resize = () => {
   camera.aspect = w / h;
   camera.updateProjectionMatrix();
 };
+const debouncedResize = debounce(resize, 150);
 
 const onContextLost = (e) => {
   e.preventDefault();
@@ -176,6 +177,17 @@ const onContextRestored = () => {
 const animate = () => {
   if (!renderer || renderer.getContext().isContextLost()) return;
   time += 0.016;
+
+  if (isTracking.value && trackedEl && camera && renderer) {
+    // Read tracked element position (runs inside animate, no separate ticker)
+    const rect = trackedEl.getBoundingClientRect();
+    const cw = renderer.domElement.clientWidth || window.innerWidth;
+    const ch = renderer.domElement.clientHeight || window.innerHeight;
+    const { x, y, worldSize } = domRectToWorld(rect, camera, cw, ch);
+    trackedBase.x = x;
+    trackedBase.y = y;
+    trackedBase.scale = (worldSize / 2) * guiParams.trackingScale;
+  }
 
   if (isTracking.value) {
     // ── Tracking mode ─────────────────────────────────────────────────
@@ -363,7 +375,7 @@ const init = () => {
     mesh.add(gltf.scene);
   });
 
-  window.addEventListener("resize", resize);
+  window.addEventListener("resize", debouncedResize);
   window.addEventListener("pointermove", onPointerMove);
 
   // ─── lil-gui ─────────────────────────────────────────────────────────
@@ -441,42 +453,21 @@ const prefersReducedMotion =
 
 /**
  * Démarre le tracking temps réel d'un élément DOM.
- * Utilise gsap.ticker pour lire getBoundingClientRect() à chaque frame
- * et écrire la position/scale DIRECTEMENT sur le mesh (zéro lerp).
- * Parfait pour piloter depuis une anim GSAP / ScrollTrigger.
+ * La lecture de getBoundingClientRect() se fait dans animate(),
+ * pas dans un gsap.ticker séparé.
  */
 const startTracking = (el) => {
-  stopTracking(); // retire un éventuel ticker précédent
+  stopTracking();
 
   trackedEl = el;
   isTracking.value = true;
   mode.value = "tracking";
-
-  gsapTickerFn = () => {
-    if (!camera || !mesh || !renderer || !trackedEl) return;
-
-    const rect = trackedEl.getBoundingClientRect();
-    const cw = renderer.domElement.clientWidth || window.innerWidth;
-    const ch = renderer.domElement.clientHeight || window.innerHeight;
-
-    const { x, y, worldSize } = domRectToWorld(rect, camera, cw, ch);
-
-    // Write to trackedBase — animate() reads it and adds the hover offset
-    trackedBase.x = x;
-    trackedBase.y = y;
-    trackedBase.scale = (worldSize / 2) * guiParams.trackingScale;
-  };
-
-  gsap.ticker.add(gsapTickerFn);
 };
 
 /**
  * Arrête le tracking et repasse en mode mouse-follow.
  */
 const stopTracking = () => {
-  if (!gsapTickerFn) return;
-  gsap.ticker.remove(gsapTickerFn);
-  gsapTickerFn = null;
   trackedEl = null;
   isTracking.value = false;
   mode.value = "free";
@@ -498,7 +489,7 @@ onBeforeUnmount(() => {
   useRAFManager().unregister("three");
   stopTracking();
   gui?.destroy();
-  window.removeEventListener("resize", resize);
+  window.removeEventListener("resize", debouncedResize);
   window.removeEventListener("pointermove", onPointerMove);
   renderer?.domElement?.removeEventListener("webglcontextlost", onContextLost);
   renderer?.domElement?.removeEventListener(
