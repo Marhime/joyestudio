@@ -72,5 +72,26 @@ export function useSmiley() {
     hide: (
       opts?: Pick<SmileyMoveOptions, "duration" | "onComplete">,
     ): Promise<void> => api()?.hide(opts) ?? Promise.resolve(),
+
+    /**
+     * Set world-space position directly — for scroll-scrub animations.
+     * GSAP tween calls this in onUpdate.
+     */
+    setScrubPosition: (x: number, y: number, scale: number): void => {
+      api()?.setScrubPosition(x, y, scale);
+    },
+
+    /**
+     * Exit scrub mode, return to free mouse-follow.
+     */
+    clearScrub: (): void => {
+      api()?.clearScrub();
+    },
+
+    /** Access the Three.js camera for domRectToWorld calculations. */
+    getCamera: () => api()?.getCamera() ?? null,
+
+    /** Access the Three.js renderer for canvas size. */
+    getRenderer: () => api()?.getRenderer() ?? null,
   };
 }

@@ -57,4 +57,16 @@ export interface SmileyAPI {
   hide: (
     opts?: Pick<SmileyMoveOptions, "duration" | "onComplete">,
   ) => Promise<void>;
+
+  /** Set world-space position directly (for scroll-scrub animations). */
+  setScrubPosition: (x: number, y: number, scale: number) => void;
+
+  /** Exit scrub mode, return to free mouse-follow. */
+  clearScrub: () => void;
+
+  /** Access the Three.js camera for domRectToWorld calculations. */
+  getCamera: () => any;
+
+  /** Access the Three.js renderer for canvas size. */
+  getRenderer: () => any;
 }

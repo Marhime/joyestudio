@@ -57,8 +57,9 @@
 
 <script setup>
 import RightArrow from "../icons/RightArrow.vue";
+import { domRectToWorld } from "~/utils/domToWorld";
 
-const { gsap, Flip, SplitText, mm, BP, scheduleRefresh } = useGSAP();
+const { gsap, SplitText, mm, BP, scheduleRefresh } = useGSAP();
 
 const sectionRef = useTemplateRef("sectionRef");
 
@@ -72,27 +73,58 @@ const setupAnimations = () => {
 
   mm.add(BP.desktop, () => {
     const hiyeFace = document.querySelector("[hiye-face]");
-    const finalLeftContainer = document.querySelector(
-      "[hiye-face-placeholder]",
-    );
-    if (!hiyeFace || !finalLeftContainer || !sectionRef.value) return;
+    const placeholder = document.querySelector("[hiye-face-placeholder]");
+    if (!hiyeFace || !placeholder || !sectionRef.value) return;
 
-    const finalState = Flip.getState(finalLeftContainer);
+    const cam = pixelBlob?.value?.getCamera();
+    const ren = pixelBlob?.value?.getRenderer();
+    if (cam && ren) {
+      const trackingScale = 0.48;
 
-    const tlFlip = gsap.timeline({
-      scrollTrigger: {
-        trigger: sectionRef.value,
-        start: "top bottom",
-        end: "top top",
-        scrub: 1,
-        invalidateOnRefresh: true,
-      },
-    });
-
-    tlFlip.add(
-      Flip.fit(hiyeFace, finalState, { ease: "none", duration: 1 }),
-      0,
-    );
+      gsap.timeline({
+        scrollTrigger: {
+          trigger: sectionRef.value,
+          start: "top bottom",
+          end: "top top",
+          scrub: 1,
+          invalidateOnRefresh: true,
+          onUpdate: (self) => {
+            // Read live DOM positions every tick — never stale
+            const cw = ren.domElement.clientWidth || window.innerWidth;
+            const ch = ren.domElement.clientHeight || window.innerHeight;
+            const a = domRectToWorld(
+              hiyeFace.getBoundingClientRect(),
+              cam,
+              cw,
+              ch,
+            );
+            const b = domRectToWorld(
+              placeholder.getBoundingClientRect(),
+              cam,
+              cw,
+              ch,
+            );
+            const sA = (a.worldSize / 2) * trackingScale;
+            const sB = (b.worldSize / 2) * trackingScale;
+            const t = self.progress;
+            pixelBlob?.value?.setScrubPosition(
+              a.x + (b.x - a.x) * t,
+              a.y + (b.y - a.y) * t,
+              sA + (sB - sA) * t,
+            );
+          },
+          onLeave: () => {
+            // Scrub done — track placeholder so smiley follows it on scroll
+            pixelBlob?.value?.startTracking(placeholder);
+          },
+          onLeaveBack: () => {
+            // Back to hero — track hiye-face again
+            const hf = document.querySelector("[hiye-face]");
+            if (hf) pixelBlob?.value?.startTracking(hf);
+          },
+        },
+      });
+    }
 
     const title = sectionRef.value.querySelectorAll(".about__title h2 span");
     const titleSplit = new SplitText(title, { type: "lines", mask: "lines" });
@@ -110,7 +142,6 @@ const setupAnimations = () => {
         trigger: title[0],
         start: "top 50%",
         invalidateOnRefresh: true,
-        markers: true,
       },
     });
 
@@ -180,27 +211,55 @@ const setupAnimations = () => {
 
   mm.add(BP.mobile, () => {
     const hiyeFace = document.querySelector("[hiye-face]");
-    const finalLeftContainer = document.querySelector(
-      "[hiye-face-placeholder]",
-    );
-    if (!hiyeFace || !finalLeftContainer || !sectionRef.value) return;
+    const placeholder = document.querySelector("[hiye-face-placeholder]");
+    if (!hiyeFace || !placeholder || !sectionRef.value) return;
 
-    const finalState = Flip.getState(finalLeftContainer);
+    const cam = pixelBlob?.value?.getCamera();
+    const ren = pixelBlob?.value?.getRenderer();
+    if (cam && ren) {
+      const trackingScale = 0.48;
 
-    const tlFlip = gsap.timeline({
-      scrollTrigger: {
-        trigger: sectionRef.value,
-        start: "top bottom",
-        end: "top top",
-        scrub: 1,
-        invalidateOnRefresh: true,
-      },
-    });
-
-    tlFlip.add(
-      Flip.fit(hiyeFace, finalState, { ease: "none", duration: 1 }),
-      0,
-    );
+      gsap.timeline({
+        scrollTrigger: {
+          trigger: sectionRef.value,
+          start: "top bottom",
+          end: "top top",
+          scrub: 1,
+          invalidateOnRefresh: true,
+          onUpdate: (self) => {
+            const cw = ren.domElement.clientWidth || window.innerWidth;
+            const ch = ren.domElement.clientHeight || window.innerHeight;
+            const a = domRectToWorld(
+              hiyeFace.getBoundingClientRect(),
+              cam,
+              cw,
+              ch,
+            );
+            const b = domRectToWorld(
+              placeholder.getBoundingClientRect(),
+              cam,
+              cw,
+              ch,
+            );
+            const sA = (a.worldSize / 2) * trackingScale;
+            const sB = (b.worldSize / 2) * trackingScale;
+            const t = self.progress;
+            pixelBlob?.value?.setScrubPosition(
+              a.x + (b.x - a.x) * t,
+              a.y + (b.y - a.y) * t,
+              sA + (sB - sA) * t,
+            );
+          },
+          onLeave: () => {
+            pixelBlob?.value?.startTracking(placeholder);
+          },
+          onLeaveBack: () => {
+            const hf = document.querySelector("[hiye-face]");
+            if (hf) pixelBlob?.value?.startTracking(hf);
+          },
+        },
+      });
+    }
 
     // Same approach as desktop — iterate .about__content children in DOM order.
     const splits = [];

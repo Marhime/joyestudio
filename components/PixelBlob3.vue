@@ -41,6 +41,11 @@ const mode = ref("free"); // 'free' | 'tracking'
 // Base world position written by gsapTickerFn each tick
 const trackedBase = { x: 0, y: 0, scale: props.radius };
 
+// ─── Scrub-driven state ──────────────────────────────────────────────────
+// GSAP writes scrubTarget via onUpdate; animate() uses it directly.
+const isScrubbing = ref(false);
+const scrubTarget = { x: 0, y: 0, scale: props.radius };
+
 const guiParams = {
   // ── Shader / Appearance
   pixelSize: 0.004,
@@ -178,7 +183,12 @@ const animate = () => {
   if (!renderer || renderer.getContext().isContextLost()) return;
   time += 0.016;
 
-  if (isTracking.value && trackedEl && camera && renderer) {
+  if (isScrubbing.value) {
+    // GSAP scrub drives position directly — just copy target
+    trackedBase.x = scrubTarget.x;
+    trackedBase.y = scrubTarget.y;
+    trackedBase.scale = scrubTarget.scale;
+  } else if (isTracking.value && trackedEl && camera && renderer) {
     // Read tracked element position (runs inside animate, no separate ticker)
     const rect = trackedEl.getBoundingClientRect();
     const cw = renderer.domElement.clientWidth || window.innerWidth;
@@ -189,7 +199,7 @@ const animate = () => {
     trackedBase.scale = (worldSize / 2) * guiParams.trackingScale;
   }
 
-  if (isTracking.value) {
+  if (isTracking.value || isScrubbing.value) {
     // ── Tracking mode ─────────────────────────────────────────────────
     // followMouse lags gently behind the cursor (same lerp as free mode)
     followMouse.x += (mouse.x - followMouse.x) * guiParams.followLerp;
@@ -354,10 +364,8 @@ const init = () => {
   scene.add(mesh);
 
   new GLTFLoader().load(modelUrl, (gltf) => {
-    console.log("Model loaded:", gltf);
     gltf.scene.traverse((child) => {
       if (!child.isMesh) return;
-      console.log("mesh found:", child.name);
       if (isFeature(child.name)) {
         // Features → solid fill, no pixel effect
         child.material = new THREE.MeshBasicMaterial({
@@ -457,8 +465,8 @@ const prefersReducedMotion =
  * pas dans un gsap.ticker séparé.
  */
 const startTracking = (el) => {
-  stopTracking();
-
+  // Set new tracking directly — skip stopTracking() to avoid a "free" frame
+  isScrubbing.value = false;
   trackedEl = el;
   isTracking.value = true;
   mode.value = "tracking";
@@ -478,7 +486,39 @@ const stopTracking = () => {
 const track = startTracking;
 const release = stopTracking;
 
-defineExpose({ startTracking, stopTracking, isTracking, track, release, mode });
+/**
+ * Set world-space position directly — used by scroll-scrub animations.
+ * GSAP tween calls this in onUpdate; animate() renders the result.
+ */
+const setScrubPosition = (x, y, s) => {
+  scrubTarget.x = x;
+  scrubTarget.y = y;
+  scrubTarget.scale = s;
+  if (!isScrubbing.value) {
+    isScrubbing.value = true;
+    isTracking.value = false;
+    trackedEl = null;
+    mode.value = "tracking";
+  }
+};
+
+const clearScrub = () => {
+  isScrubbing.value = false;
+  mode.value = "free";
+};
+
+defineExpose({
+  startTracking,
+  stopTracking,
+  isTracking,
+  track,
+  release,
+  mode,
+  setScrubPosition,
+  clearScrub,
+  getCamera: () => camera,
+  getRenderer: () => renderer,
+});
 
 onMounted(() => {
   if (prefersReducedMotion.matches) return; // skip Three.js entirely
