@@ -7,7 +7,12 @@
             class="contact-home__content-line contact-home__content-line--1"
           >
             R<span class="t2-h2 font-como font-italic">e</span>ady
-            <span class="face-placeholder"></span>
+            <span
+              ref="anchorRef"
+              contact-smiley-anchor
+              data-smiley-scale="1.3"
+              class="face-placeholder"
+            ></span>
           </span>
 
           <span class="contact-home__content-line--2 icon"><RightArrow /></span>
@@ -23,6 +28,45 @@
 
 <script setup>
 import RightArrow from "../icons/RightArrow.vue";
+import { useGSAP } from "~/composables/useGSAP";
+import { useSmiley } from "~/composables/useSmiley";
+
+const sectionRef = useTemplateRef("sectionRef");
+const anchorRef = useTemplateRef("anchorRef");
+
+const { ScrollTrigger, mm, BP, scheduleRefresh } = useGSAP();
+const smiley = useSmiley();
+
+onMounted(() => {
+  nextTick(() => {
+    if (!sectionRef.value) return;
+
+    // Same logic for desktop and mobile — track swap is a one-liner.
+    const setup = () => {
+      ScrollTrigger.create({
+        trigger: sectionRef.value,
+        start: "top bottom",
+        invalidateOnRefresh: true,
+        onEnter: () => {
+          if (anchorRef.value) smiley.track(anchorRef.value);
+        },
+        onLeaveBack: () => {
+          const about = document.querySelector("[hiye-face-placeholder]");
+          if (about) smiley.track(about);
+        },
+      });
+      return () => {};
+    };
+
+    mm.add(BP.desktop, setup);
+    mm.add(BP.mobile, setup);
+
+    // Reduced motion: do nothing — smiley stays in whatever mode it was.
+    mm.add(BP.reducedMotion, () => () => {});
+
+    scheduleRefresh();
+  });
+});
 </script>
 
 <style lang="scss" scoped>
@@ -39,8 +83,6 @@ import RightArrow from "../icons/RightArrow.vue";
     display: block;
     width: 6rem;
     height: 6rem;
-    background-color: var(--color-white);
-    border-radius: 50%;
     margin-left: var(--content-margin);
     @include respond-to("desktop") {
       width: 13rem;

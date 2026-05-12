@@ -229,9 +229,11 @@ const animate = (now) => {
     const cw = renderer.domElement.clientWidth || window.innerWidth;
     const ch = renderer.domElement.clientHeight || window.innerHeight;
     const { x, y, worldSize } = domRectToWorld(rect, camera, cw, ch);
+    // Per-anchor optional scale multiplier (read from data-smiley-scale="1.3")
+    const localMul = parseFloat(trackedEl.dataset.smileyScale) || 1;
     trackedBase.x = x;
     trackedBase.y = y;
-    trackedBase.scale = (worldSize / 2) * guiParams.trackingScale;
+    trackedBase.scale = (worldSize / 2) * guiParams.trackingScale * localMul;
   }
 
   if (isTracking.value || isScrubbing.value) {
