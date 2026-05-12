@@ -7,10 +7,11 @@ import { onMounted, onBeforeUnmount, ref } from "vue";
 import * as THREE from "three";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 import { gsap } from "gsap";
-import modelUrl from "~/assets/3D/smileyV2.glb?url";
+import modelUrl from "~/assets/3D/smileyV3.glb?url";
 import { domRectToWorld } from "~/utils/domToWorld";
 import { useRAFManager } from "~/composables/useRAFManager";
 import { debounce } from "~/utils/debounce";
+import { perfMonitor } from "~/utils/perfMonitor";
 
 const props = defineProps({
   color: { type: Number, default: 0xffe15a },
@@ -23,15 +24,35 @@ const container = ref(null);
 let renderer, scene, camera, mesh, geometry, gui;
 const meshes = []; // sphere sub-meshes with shader → shared uniform updates
 let featureMeshes = []; // eyes + mouth → MeshBasicMaterial
+let mouthMesh = null; // reference to the mouth (Cylinder) for shape-key control
 const mouse = new THREE.Vector2(0.5, 0.5);
 const followMouse = new THREE.Vector2(0.5, 0.5);
 const velocityDir = new THREE.Vector2(0, 0);
 const prevPos = new THREE.Vector2(0, 0);
 let moveSpeed = 0,
   smoothVelo = 0,
-  time = 0,
   tickCounter = 0,
   trailStrength = 0;
+
+// Render-skip state: when the visual scene hasn't changed beyond these epsilons,
+// we skip renderer.render() entirely. Math (lerps, etc.) still runs so the next
+// dirty frame produces the same image as if we'd never skipped.
+const prevRender = {
+  px: NaN,
+  py: NaN,
+  rx: NaN,
+  ry: NaN,
+  rz: NaN,
+  sc: NaN,
+  trail: NaN,
+  tick: NaN,
+};
+let forceRender = true;
+
+// Frame-rate independent timing: dt is normalized so 1 unit = a 60fps frame.
+// At 60fps dt ≈ 1, at 120fps dt ≈ 0.5. Multiply per-frame increments by dt
+// so animation speed is identical across refresh rates.
+let lastFrameNow = 0;
 
 // ─── Dom-tracking state ──────────────────────────────────────────────────
 // Position read inside animate() — no separate gsap.ticker callback
@@ -52,6 +73,14 @@ const guiParams = {
   edgeWidth: 0.4,
   trailStretch: 12,
   flickerSpeed: 20,
+  // Idle shimmer: drift of the noise hash at rest. The shader's hash function
+  // is binary (any change = full randomization), so values > 0 produce flicker
+  // regardless of how small. Use 0 unless you want a busy noise look.
+  idleShimmer: 0,
+  // Idle breathing: gentle sinusoidal modulation of uTrail at rest.
+  // Smooth because uTrail affects cell stretch geometrically (continuous shader response).
+  idleBreathAmp: 0, // amplitude of the breath on uTrail (0 = off)
+  idleBreathFreq: 0.4, // breaths per second (Hz)
   solidStart: 0.3,
   solidEnd: 3,
   trailBias: 1.5,
@@ -166,6 +195,7 @@ const resize = () => {
   renderer.setSize(w, h);
   camera.aspect = w / h;
   camera.updateProjectionMatrix();
+  forceRender = true;
 };
 const debouncedResize = debounce(resize, 150);
 
@@ -179,9 +209,14 @@ const onContextRestored = () => {
 };
 
 // ─── Loop ──────────────────────────────────────────────────────────────────
-const animate = () => {
+const animate = (now) => {
   if (!renderer || renderer.getContext().isContextLost()) return;
-  time += 0.016;
+
+  // dt = 1 means a 60fps frame (16.667 ms). At 120fps dt ≈ 0.5.
+  // Capped at 3 so a tab-visibility resume doesn't make tickCounter jump.
+  const dt =
+    lastFrameNow === 0 ? 1 : Math.min((now - lastFrameNow) / 16.667, 3);
+  lastFrameNow = now;
 
   if (isScrubbing.value) {
     // GSAP scrub drives position directly — just copy target
@@ -234,37 +269,30 @@ const animate = () => {
     const inv = 1.0 / speed;
     velocityDir.x += (vx * inv - velocityDir.x) * 0.15;
     velocityDir.y += (vy * inv - velocityDir.y) * 0.15;
-  } else {
-    velocityDir.x *= 0.92;
-    velocityDir.y *= 0.92;
   }
+  // When speed drops below the threshold, freeze velocityDir instead of
+  // multiplying it by 0.92. The shader uses normalize(uVeloDir + 0.001) to
+  // orient its cell grid — letting velocityDir shrink toward (0,0) makes the
+  // tiny epsilon dominate and rotates the apparent grid toward the X axis.
+  // Freezing keeps the grid stable; trailStrength still decays, so the
+  // anisotropic stretch fades to round cells without any apparent spin.
   prevPos.set(mesh.position.x, mesh.position.y);
 
   const clamped = Math.min(moveSpeed * 0.025, 0.12);
   smoothVelo += (clamped - smoothVelo) * 0.08;
 
-  // Update shader uniforms on all sub-meshes
-  const sharedUniforms = {
-    uVelo: smoothVelo,
-    uPixelSize: guiParams.pixelSize,
-    uEdgeWidth: guiParams.edgeWidth,
-    uTrailStretch: guiParams.trailStretch,
-    uSolidStart: guiParams.solidStart,
-    uSolidEnd: guiParams.solidEnd,
-    uTrailBias: guiParams.trailBias,
-    uCoarseRatio: guiParams.coarseRatio,
-  };
+  // Update shader uniforms on all sub-meshes (direct assignment, no intermediate object)
   for (const m of meshes) {
     const u = m.material.uniforms;
-    u.uVelo.value = sharedUniforms.uVelo;
-    u.uPixelSize.value = sharedUniforms.uPixelSize;
-    u.uEdgeWidth.value = sharedUniforms.uEdgeWidth;
-    u.uTrailStretch.value = sharedUniforms.uTrailStretch;
+    u.uVelo.value = smoothVelo;
+    u.uPixelSize.value = guiParams.pixelSize;
+    u.uEdgeWidth.value = guiParams.edgeWidth;
+    u.uTrailStretch.value = guiParams.trailStretch;
     u.uVeloDir.value.set(velocityDir.x, velocityDir.y);
-    u.uSolidStart.value = sharedUniforms.uSolidStart;
-    u.uSolidEnd.value = sharedUniforms.uSolidEnd;
-    u.uTrailBias.value = sharedUniforms.uTrailBias;
-    u.uCoarseRatio.value = sharedUniforms.uCoarseRatio;
+    u.uSolidStart.value = guiParams.solidStart;
+    u.uSolidEnd.value = guiParams.solidEnd;
+    u.uTrailBias.value = guiParams.trailBias;
+    u.uCoarseRatio.value = guiParams.coarseRatio;
   }
 
   // trailStrength: rises fast with velocity, decays slowly after stop
@@ -273,14 +301,28 @@ const animate = () => {
   trailStrength +=
     (targetTrail - trailStrength) *
     (targetTrail > trailStrength ? guiParams.trailRise : guiParams.trailDecay);
-  for (const m of meshes) m.material.uniforms.uTrail.value = trailStrength;
 
-  // Tick only advances when moving → pixels static at rest
-  if (smoothVelo > 0.004) {
-    tickCounter += smoothVelo * guiParams.flickerSpeed;
-    for (const m of meshes)
-      m.material.uniforms.uTick.value = Math.floor(tickCounter);
-  }
+  // Idle breathing: gentle sinusoidal modulation of uTrail when at rest.
+  // Smooth because uTrail affects cell stretch geometrically — unlike uTick
+  // which is fed through a hash and randomizes on any change.
+  // Uses absolute time so the rate is frame-rate independent automatically.
+  const idleBreath =
+    smoothVelo > 0.004
+      ? 0
+      : guiParams.idleBreathAmp *
+        Math.sin((now / 1000) * 2 * Math.PI * guiParams.idleBreathFreq);
+
+  for (const m of meshes)
+    m.material.uniforms.uTrail.value = trailStrength + idleBreath;
+
+  // Tick: rapid scroll during motion, slow drift at rest.
+  // Float (no Math.floor) so the noise pattern shifts continuously, multiplied
+  // by dt so the speed is identical across 60fps / 120fps / 144fps screens.
+  tickCounter +=
+    (smoothVelo > 0.004
+      ? smoothVelo * guiParams.flickerSpeed
+      : guiParams.idleShimmer) * dt;
+  for (const m of meshes) m.material.uniforms.uTick.value = tickCounter;
 
   // Subtle tilt toward mouse
   const baseRotX = (guiParams.rotX * Math.PI) / 180;
@@ -297,7 +339,41 @@ const animate = () => {
     guiParams.tiltLerp;
   mesh.rotation.z += (baseRotZ - mesh.rotation.z) * guiParams.tiltLerp;
 
-  renderer.render(scene, camera);
+  // Skip render when nothing visible has changed since last paint.
+  // Tracking/scrubbing modes always render — they're DOM-driven and the
+  // visible state can shift between frames without our math noticing.
+  // tickCounter compared as float with a tiny epsilon so the idle shimmer
+  // still renders smoothly (skip would cause strobing).
+  const dirty =
+    forceRender ||
+    isTracking.value ||
+    isScrubbing.value ||
+    Math.abs(mesh.position.x - prevRender.px) > 0.05 ||
+    Math.abs(mesh.position.y - prevRender.py) > 0.05 ||
+    Math.abs(mesh.rotation.x - prevRender.rx) > 0.0005 ||
+    Math.abs(mesh.rotation.y - prevRender.ry) > 0.0005 ||
+    Math.abs(mesh.rotation.z - prevRender.rz) > 0.0005 ||
+    Math.abs(mesh.scale.x - prevRender.sc) > 0.05 ||
+    Math.abs(trailStrength + idleBreath - prevRender.trail) > 0.001 ||
+    Math.abs(tickCounter - prevRender.tick) > 1e-9;
+
+  if (dirty) {
+    perfMonitor.markStart("three");
+    renderer.render(scene, camera);
+    perfMonitor.markEnd("three");
+
+    prevRender.px = mesh.position.x;
+    prevRender.py = mesh.position.y;
+    prevRender.rx = mesh.rotation.x;
+    prevRender.ry = mesh.rotation.y;
+    prevRender.rz = mesh.rotation.z;
+    prevRender.sc = mesh.scale.x;
+    prevRender.trail = trailStrength + idleBreath;
+    prevRender.tick = tickCounter;
+    forceRender = false;
+  }
+
+  perfMonitor.tickFrame();
 };
 
 // ─── Init ──────────────────────────────────────────────────────────────────
@@ -355,7 +431,7 @@ const init = () => {
 
   // ── GLB Load ──────────────────────────────────────────────────
   // Feature mesh names — matches L_Eye, R_Eye, Cylinder (mouth)
-  const FEATURE_NAMES = ["eye", "gpencil", "mouth", "cylinder"];
+  const FEATURE_NAMES = ["eye", "gpencil", "mouth", "cylinder", "face"];
   const isFeature = (name) =>
     FEATURE_NAMES.some((k) => name.toLowerCase().includes(k));
 
@@ -374,6 +450,12 @@ const init = () => {
           depthWrite: true,
         });
         featureMeshes.push(child);
+        // Identify the mouth mesh (Cylinder) so we can drive its shape keys.
+        // GLTFLoader populates morphTargetDictionary / morphTargetInfluences
+        // when the GLB export includes shape keys.
+        if (/cylinder|mouth|face/i.test(child.name)) {
+          mouthMesh = child;
+        }
       } else {
         // Sphere → full pixel shader
         child.material = makeMaterial(guiParams.color);
@@ -381,72 +463,209 @@ const init = () => {
       }
     });
     mesh.add(gltf.scene);
+    // Basis is the default state (all morph influences = 0 by default).
+
+    // Debug log — tells us what got loaded so we can see if the join broke things.
+    if (typeof window !== "undefined") {
+      const allMeshNames = [];
+      gltf.scene.traverse((c) => {
+        if (c.isMesh) allMeshNames.push(c.name);
+      });
+      console.log("[PixelBlob3] GLB loaded:", {
+        allMeshes: allMeshNames,
+        featureMeshes: featureMeshes.map((m) => ({
+          name: m.name,
+          visible: m.visible,
+          position: m.position.toArray(),
+          scale: m.scale.toArray(),
+          shapeKeys: m.morphTargetDictionary,
+        })),
+        mouthMesh: mouthMesh
+          ? {
+              name: mouthMesh.name,
+              shapeKeys: mouthMesh.morphTargetDictionary,
+              influences: mouthMesh.morphTargetInfluences,
+            }
+          : null,
+      });
+    }
+
+    forceRender = true;
   });
 
   window.addEventListener("resize", debouncedResize);
   window.addEventListener("pointermove", onPointerMove);
 
   // ─── lil-gui ─────────────────────────────────────────────────────────
-  // import("lil-gui").then(({ default: GUI }) => {
-  //   gui = new GUI({ title: "✦ Pixel Blob", width: 270 });
+  // Activated via ?gui=1 in the URL — keeps the tuner out of normal browsing.
+  const guiEnabled =
+    typeof window !== "undefined" &&
+    new URLSearchParams(window.location.search).get("gui") === "1";
 
-  //   // ── Appearance ─────────────────────────────────────────────────────
-  //   const fAppear = gui.addFolder("◈ Appearance");
-  //   fAppear.add(guiParams, "pixelSize", 0.001, 0.03, 0.001).name("Pixel size");
-  //   fAppear.add(guiParams, "edgeWidth", 0.05, 1.2, 0.01).name("Edge width");
-  //   fAppear.add(guiParams, "solidStart", 0, 0.98, 0.01).name("Solid start");
-  //   fAppear.add(guiParams, "solidEnd", 0.5, 3.0, 0.01).name("Solid end");
-  //   fAppear.add(guiParams, "coarseRatio", 1.0, 5.0, 0.1).name("Coarse layer");
-  //   fAppear
-  //     .add(guiParams, "trackingScale", 0.1, 2.0, 0.01)
-  //     .name("Tracking size");
-  //   fAppear.add(guiParams, "hoverOffset", 0, 80, 0.5).name("Hover offset");
+  if (guiEnabled) {
+    import("lil-gui").then(({ default: GUI }) => {
+      gui = new GUI({ title: "✦ Pixel Blob", width: 270 });
 
-  //   // ── Trail ──────────────────────────────────────────────────────────
-  //   const fTrail = gui.addFolder("↝ Trail");
-  //   fTrail.add(guiParams, "trailStretch", 0.0, 12.0, 0.5).name("Stretch");
-  //   fTrail.add(guiParams, "trailBias", 0.0, 8.0, 0.1).name("Edge bias");
-  //   fTrail.add(guiParams, "flickerSpeed", 1, 20, 0.5).name("Flicker speed");
-  //   fTrail.add(guiParams, "trailVeloMult", 1.0, 20.0, 0.5).name("Velo → trail");
-  //   fTrail.add(guiParams, "trailRise", 0.01, 0.3, 0.005).name("Rise speed");
-  //   fTrail.add(guiParams, "trailDecay", 0.005, 0.15, 0.005).name("Decay speed");
-  //   fTrail.open(false);
+      // ── Appearance ─────────────────────────────────────────────────────
+      const fAppear = gui.addFolder("◈ Appearance");
+      fAppear
+        .add(guiParams, "pixelSize", 0.001, 0.03, 0.001)
+        .name("Pixel size");
+      fAppear.add(guiParams, "edgeWidth", 0.05, 1.2, 0.01).name("Edge width");
+      fAppear.add(guiParams, "solidStart", 0, 0.98, 0.01).name("Solid start");
+      fAppear.add(guiParams, "solidEnd", 0.5, 3.0, 0.01).name("Solid end");
+      fAppear.add(guiParams, "coarseRatio", 1.0, 5.0, 0.1).name("Coarse layer");
+      fAppear
+        .add(guiParams, "trackingScale", 0.1, 2.0, 0.01)
+        .name("Tracking size");
+      fAppear.add(guiParams, "hoverOffset", 0, 80, 0.5).name("Hover offset");
 
-  //   // ── Motion ─────────────────────────────────────────────────────────
-  //   const fMotion = gui.addFolder("⤳ Motion");
-  //   fMotion.add(guiParams, "followLerp", 0.01, 0.3, 0.005).name("Mouse follow");
-  //   fMotion.add(guiParams, "posLerp", 0.01, 0.2, 0.005).name("Pos lerp");
-  //   fMotion.add(guiParams, "tiltAmplY", 0.0, 0.6, 0.01).name("Tilt X-axis");
-  //   fMotion.add(guiParams, "tiltAmplX", 0.0, 0.6, 0.01).name("Tilt Y-axis");
-  //   fMotion.add(guiParams, "tiltLerp", 0.01, 0.2, 0.005).name("Tilt speed");
-  //   fMotion.open(false);
+      // ── Trail & shimmer ────────────────────────────────────────────────
+      const fTrail = gui.addFolder("↝ Trail & shimmer");
+      fTrail.add(guiParams, "trailStretch", 0.0, 12.0, 0.5).name("Stretch");
+      fTrail.add(guiParams, "trailBias", 0.0, 8.0, 0.1).name("Edge bias");
+      fTrail
+        .add(guiParams, "flickerSpeed", 1, 20, 0.5)
+        .name("Flicker (motion)");
+      fTrail
+        .add(guiParams, "idleBreathAmp", 0, 0.15, 0.005)
+        .name("Idle breath amp");
+      fTrail
+        .add(guiParams, "idleBreathFreq", 0, 2, 0.05)
+        .name("Idle breath Hz");
+      fTrail
+        .add(guiParams, "idleShimmer", 0, 0.001, 0.000001)
+        .name("Idle shimmer (noise)");
+      fTrail
+        .add(guiParams, "trailVeloMult", 1.0, 20.0, 0.5)
+        .name("Velo → trail");
+      fTrail.add(guiParams, "trailRise", 0.01, 0.3, 0.005).name("Rise speed");
+      fTrail
+        .add(guiParams, "trailDecay", 0.005, 0.15, 0.005)
+        .name("Decay speed");
+      fTrail.open(true);
 
-  //   // ── Rotation ──────────────────────────────────────────────────
-  //   const fRot = gui.addFolder("↺ Rotation");
-  //   fRot.add(guiParams, "rotX", -180, 180, 1).name("Rot X");
-  //   fRot.add(guiParams, "rotY", -180, 180, 1).name("Rot Y");
-  //   fRot.add(guiParams, "rotZ", -180, 180, 1).name("Rot Z");
-  //   fRot.open(true);
+      // ── Expressions (shape keys) ──────────────────────────────────────
+      // Independent sliders for direct control (additive). Trigger buttons
+      // use setExpression's exclusive mode to cross-fade between expressions
+      // and auto-revert to Basis (the default neutral state).
+      const fExpr = gui.addFolder("☻ Expressions");
+      const exprState = { shocked: 0, happy: 0, wink: 0 };
 
-  //   // ── Color ──────────────────────────────────────────────────────────
-  //   const FEATURE_NAMES = ["eye", "gpencil", "mouth", "cylinder"];
-  //   const isFeature = (n) =>
-  //     FEATURE_NAMES.some((k) => n.toLowerCase().includes(k));
+      const writeInfluence = (name) => (v) => {
+        const idx = findMorphIdx(name);
+        if (idx === undefined || !mouthMesh?.morphTargetInfluences) return;
+        mouthMesh.morphTargetInfluences[idx] = v;
+        forceRender = true;
+      };
 
-  //   gui
-  //     .addColor(guiParams, "color")
-  //     .name("Body color")
-  //     .onChange((v) => {
-  //       for (const m of meshes)
-  //         if (!isFeature(m.name)) m.material.uniforms.uColor.value.set(v);
-  //     });
-  //   gui
-  //     .addColor(guiParams, "featureColor")
-  //     .name("Face color")
-  //     .onChange((v) => {
-  //       for (const m of featureMeshes) m.material.color.set(v);
-  //     });
-  // });
+      const syncSliders = () => {
+        if (!mouthMesh?.morphTargetInfluences) return;
+        for (const name of Object.keys(exprState)) {
+          const idx = findMorphIdx(name);
+          if (idx !== undefined)
+            exprState[name] = mouthMesh.morphTargetInfluences[idx];
+        }
+        fExpr.controllers.forEach((c) => c.updateDisplay());
+      };
+
+      // Tween everything back to 0 (Basis) — single gsap.to() call animates
+      // all indices in parallel without the self-overwriting trap.
+      const revertToBasis = (duration = 0.45) => {
+        if (!mouthMesh?.morphTargetDictionary || !mouthMesh.morphTargetInfluences)
+          return Promise.resolve();
+        const props = {
+          duration,
+          ease: "power2.out",
+          overwrite: true,
+          onUpdate: () => {
+            forceRender = true;
+          },
+        };
+        for (const idx of Object.values(mouthMesh.morphTargetDictionary)) {
+          props[idx] = 0;
+        }
+        return new Promise((resolve) => {
+          props.onComplete = resolve;
+          gsap.to(mouthMesh.morphTargetInfluences, props);
+        });
+      };
+
+      const exprActions = {
+        triggerShock: async () => {
+          await setExpression("shocked", 1, { duration: 0.25 });
+          await new Promise((r) => setTimeout(r, 600));
+          await revertToBasis();
+          syncSliders();
+        },
+        triggerHappy: async () => {
+          await setExpression("happy", 1, { duration: 0.3 });
+          await new Promise((r) => setTimeout(r, 600));
+          await revertToBasis();
+          syncSliders();
+        },
+        triggerWink: async () => {
+          await wink();
+          syncSliders();
+        },
+        resetToBasis: async () => {
+          await revertToBasis(0.3);
+          syncSliders();
+        },
+      };
+
+      fExpr
+        .add(exprState, "shocked", 0, 1, 0.01)
+        .name("Shocked level")
+        .onChange(writeInfluence("shocked"));
+      fExpr
+        .add(exprState, "happy", 0, 1, 0.01)
+        .name("Happy level")
+        .onChange(writeInfluence("happy"));
+      fExpr
+        .add(exprState, "wink", 0, 1, 0.01)
+        .name("Wink level")
+        .onChange(writeInfluence("wink"));
+      fExpr.add(exprActions, "triggerShock").name("→ Shock! (auto-revert)");
+      fExpr.add(exprActions, "triggerHappy").name("→ Happy! (auto-revert)");
+      fExpr.add(exprActions, "triggerWink").name("→ Wink! (rapid)");
+      fExpr.add(exprActions, "resetToBasis").name("↺ Reset to Basis");
+      fExpr.open(true);
+
+      // ── Motion ─────────────────────────────────────────────────────────
+      const fMotion = gui.addFolder("⤳ Motion");
+      fMotion
+        .add(guiParams, "followLerp", 0.01, 0.3, 0.005)
+        .name("Mouse follow");
+      fMotion.add(guiParams, "posLerp", 0.01, 0.2, 0.005).name("Pos lerp");
+      fMotion.add(guiParams, "tiltAmplY", 0.0, 0.6, 0.01).name("Tilt X-axis");
+      fMotion.add(guiParams, "tiltAmplX", 0.0, 0.6, 0.01).name("Tilt Y-axis");
+      fMotion.add(guiParams, "tiltLerp", 0.01, 0.2, 0.005).name("Tilt speed");
+      fMotion.open(false);
+
+      // ── Rotation ──────────────────────────────────────────────────
+      const fRot = gui.addFolder("↺ Rotation");
+      fRot.add(guiParams, "rotX", -180, 180, 1).name("Rot X");
+      fRot.add(guiParams, "rotY", -180, 180, 1).name("Rot Y");
+      fRot.add(guiParams, "rotZ", -180, 180, 1).name("Rot Z");
+      fRot.open(false);
+
+      // ── Color ──────────────────────────────────────────────────────────
+      gui
+        .addColor(guiParams, "color")
+        .name("Body color")
+        .onChange((v) => {
+          for (const m of meshes)
+            if (!isFeature(m.name)) m.material.uniforms.uColor.value.set(v);
+        });
+      gui
+        .addColor(guiParams, "featureColor")
+        .name("Face color")
+        .onChange((v) => {
+          for (const m of featureMeshes) m.material.color.set(v);
+        });
+    });
+  }
 
   useRAFManager().register("three", animate);
 };
@@ -507,6 +726,114 @@ const clearScrub = () => {
   mode.value = "free";
 };
 
+/** Case-insensitive lookup of a shape key index on the mouth mesh. */
+const findMorphIdx = (name) => {
+  if (!mouthMesh?.morphTargetDictionary) return undefined;
+  const lower = name.toLowerCase();
+  for (const [k, v] of Object.entries(mouthMesh.morphTargetDictionary)) {
+    if (k.toLowerCase() === lower) return v;
+  }
+  return undefined;
+};
+
+/**
+ * Set a facial expression on the mouth mesh by tweening its shape-key influence.
+ * Requires the GLB to have been exported with shape keys ("Basis" + named keys
+ * like "smile", "shocked"). No-ops gracefully if no morph targets are present.
+ *
+ *   smiley.setExpression('shocked')             → exclusive: fade all others to 0
+ *   smiley.setExpression('shocked', 0.5)        → exclusive, partial blend
+ *   smiley.setExpression('shocked', 1, { exclusive: false })  → additive
+ *   smiley.setExpression('shocked', 0)          → fade just shocked back
+ */
+const setExpression = (name, value = 1, opts = {}) => {
+  if (!mouthMesh?.morphTargetDictionary || !mouthMesh.morphTargetInfluences) {
+    return Promise.resolve();
+  }
+  const targetIdx = findMorphIdx(name);
+  if (targetIdx === undefined) {
+    console.warn(`[PixelBlob3] Unknown shape key: "${name}"`);
+    return Promise.resolve();
+  }
+  const {
+    duration = 0.4,
+    ease = "back.out(1.6)",
+    exclusive = true,
+  } = opts;
+
+  // Build the target-property map: one entry per index to animate.
+  // Single gsap.to() call → all indices animate in parallel without
+  // mutual overwriting (which would happen with separate tweens on the
+  // same underlying array).
+  const tweenProps = {
+    [targetIdx]: value,
+    duration,
+    ease,
+    overwrite: true,
+    onUpdate: () => {
+      forceRender = true;
+    },
+  };
+
+  if (exclusive && value > 0) {
+    for (const idx of Object.values(mouthMesh.morphTargetDictionary)) {
+      if (idx === targetIdx) continue;
+      tweenProps[idx] = 0;
+    }
+  }
+
+  return new Promise((resolve) => {
+    tweenProps.onComplete = resolve;
+    gsap.to(mouthMesh.morphTargetInfluences, tweenProps);
+  });
+};
+
+/**
+ * Rapid wink: snappy close → brief hold → smooth re-open.
+ * Additive (doesn't touch other shape keys). Fire-and-forget.
+ *
+ *   smiley.wink()                                 → default snappy wink
+ *   smiley.wink({ holdDuration: 0.2 })            → slower, more emphasized
+ */
+const wink = (opts = {}) => {
+  if (!mouthMesh?.morphTargetDictionary || !mouthMesh.morphTargetInfluences) {
+    return Promise.resolve();
+  }
+  const idx = findMorphIdx("wink");
+  if (idx === undefined) {
+    console.warn('[PixelBlob3] Wink shape key not found in GLB');
+    return Promise.resolve();
+  }
+  const {
+    closeDuration = 0.08,
+    holdDuration = 0.08,
+    openDuration = 0.2,
+  } = opts;
+
+  return new Promise((resolve) => {
+    const tl = gsap.timeline({ onComplete: resolve });
+    tl.to(mouthMesh.morphTargetInfluences, {
+      [idx]: 1,
+      duration: closeDuration,
+      ease: "power2.in",
+      onUpdate: () => {
+        forceRender = true;
+      },
+    });
+    if (holdDuration > 0) {
+      tl.to({}, { duration: holdDuration });
+    }
+    tl.to(mouthMesh.morphTargetInfluences, {
+      [idx]: 0,
+      duration: openDuration,
+      ease: "power3.out",
+      onUpdate: () => {
+        forceRender = true;
+      },
+    });
+  });
+};
+
 defineExpose({
   startTracking,
   stopTracking,
@@ -516,6 +843,8 @@ defineExpose({
   mode,
   setScrubPosition,
   clearScrub,
+  setExpression,
+  wink,
   getCamera: () => camera,
   getRenderer: () => renderer,
 });

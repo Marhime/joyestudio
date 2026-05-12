@@ -7,10 +7,13 @@
   <!-- PixelBlob3 at z-index 3000, above everything except critical UI
   -->
   <PixelBlob3 ref="pixelBlobRef" />
+  <!-- Perf HUD: hidden by default. Toggle with ?perf=1 or Shift+P -->
+  <PerfHud />
 </template>
 
 <script setup lang="ts">
 import PixelGridOverlay from "~/components/layout/PixelGridOverlay.vue";
+import PerfHud from "~/components/dev/PerfHud.vue";
 import type { PageEnterHook } from "~/composables/usePageTransition";
 import type { SmileyAPI } from "./types/smiley";
 

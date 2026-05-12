@@ -5,6 +5,9 @@ import type {
   SmileyMode,
   SmileyMoveOptions,
   SmileyAppearOptions,
+  SmileyExpression,
+  SmileyExpressionOptions,
+  SmileyWinkOptions,
 } from "~/types/smiley";
 
 /**
@@ -87,6 +90,27 @@ export function useSmiley() {
     clearScrub: (): void => {
       api()?.clearScrub();
     },
+
+    /**
+     * Tween a facial expression on the mouth via shape-key influence.
+     *   smiley.setExpression('shocked')        → tween fully shocked
+     *   smiley.setExpression('shocked', 0)     → tween back to smile
+     * Returns a Promise — chainable with .then() or await.
+     */
+    setExpression: (
+      name: SmileyExpression,
+      value?: number,
+      opts?: SmileyExpressionOptions,
+    ): Promise<void> =>
+      api()?.setExpression(name, value, opts) ?? Promise.resolve(),
+
+    /**
+     * Fire a rapid wink animation (snappy close → brief hold → smooth open).
+     *   smiley.wink()                           → default quick wink
+     *   smiley.wink({ holdDuration: 0.3 })      → slower, more emphasized
+     */
+    wink: (opts?: SmileyWinkOptions): Promise<void> =>
+      api()?.wink(opts) ?? Promise.resolve(),
 
     /** Access the Three.js camera for domRectToWorld calculations. */
     getCamera: () => api()?.getCamera() ?? null,

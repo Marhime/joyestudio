@@ -3,7 +3,7 @@
     <Hero />
     <About />
     <Services />
-    <GameSection />
+    <OurProjects />
     <Contact />
   </div>
 </template>
@@ -12,7 +12,7 @@
 import About from "~/components/home/About.vue";
 import Contact from "~/components/home/Contact.vue";
 import Hero from "~/components/home/Hero.vue";
-import GameSection from "~/components/home/GameSection.vue";
+import OurProjects from "~/components/home/OurProjects.vue";
 import Services from "~/components/home/Services.vue";
 // PageEnterHook is provided by app.vue — Hero.vue consumes it directly via inject.
 // index.vue doesn't need to forward it; Hero is a descendant and inject() traverses
