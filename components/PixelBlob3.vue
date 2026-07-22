@@ -7,11 +7,32 @@ import { onMounted, onBeforeUnmount, ref } from "vue";
 import * as THREE from "three";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 import { gsap } from "gsap";
+import { CustomEase } from "gsap/CustomEase";
 import modelUrl from "~/assets/3D/smileyV3.glb?url";
 import { domRectToWorld } from "~/utils/domToWorld";
 import { useRAFManager } from "~/composables/useRAFManager";
 import { debounce } from "~/utils/debounce";
 import { perfMonitor } from "~/utils/perfMonitor";
+
+// Module-level counter for per-instance RAF ids (never rendered → SSR-safe)
+let blobInstanceCount = 0;
+
+const DEG = Math.PI / 180;
+
+// Signature motion language for the glance gesture — four named curves,
+// never randomized: the curve set IS the character. Registered at module
+// scope (client only) so glance() works even when reduced-motion skips init().
+//   joyeTurn    → yaw: 5% whisper overshoot, clean land
+//   joyeCock    → roll: overshoots to 113%, HANGS on the plateau, softens
+//   joyeRelease → return: slow peel off the pose, long soft landing
+//   joyeSettle  → roll settle: crosses neutral ~4% once, catches, lands dead
+if (import.meta.client) {
+  gsap.registerPlugin(CustomEase);
+  CustomEase.create("joyeTurn", "M0,0 C0.22,0 0.32,1.05 0.5,1.045 C0.7,1.04 0.82,1 1,1");
+  CustomEase.create("joyeCock", "M0,0 C0.16,0 0.28,1.13 0.46,1.12 C0.64,1.10 0.76,1 1,1");
+  CustomEase.create("joyeRelease", "0.55,0,0.16,1");
+  CustomEase.create("joyeSettle", "M0,0 C0.42,0 0.52,1.042 0.68,1.036 C0.84,1.01 0.93,1 1,1");
+}
 
 const props = defineProps({
   color: { type: Number, default: 0xffe15a },
@@ -21,7 +42,18 @@ const props = defineProps({
 
 const container = ref(null);
 
-let renderer, scene, camera, mesh, geometry, gui;
+// Unique RAF id per instance — a second PixelBlob3 (e.g. pages/hiye.vue)
+// must never replace or unregister this instance's animate callback in the
+// shared RAF manager.
+const rafId = `three-${++blobInstanceCount}`;
+
+// Lenis smoothed scroll velocity feeds the ambient scroll-lag (client only)
+const { $lenis } = useNuxtApp();
+
+let renderer, scene, camera, mesh, gui;
+// World-space viewport height at z=0 — set in init() from camera fov/z
+// (both fixed; only aspect varies on resize and is read live).
+let viewportWorldH = 372;
 const meshes = []; // sphere sub-meshes with shader → shared uniform updates
 let featureMeshes = []; // eyes + mouth → MeshBasicMaterial
 let mouthMesh = null; // reference to the mouth (Cylinder) for shape-key control
@@ -67,6 +99,24 @@ const trackedBase = { x: 0, y: 0, scale: props.radius };
 const isScrubbing = ref(false);
 const scrubTarget = { x: 0, y: 0, scale: props.radius };
 
+// ─── Ambient life state ──────────────────────────────────────────────────
+// baseScale = the scale the current mode wants, BEFORE the breath multiplier
+// — keeps breathing from fighting tracking/scrub scale writes (one owner each).
+// scrollLag = world-space Y offset dragged against Lenis scroll velocity;
+// it moves mesh.position, so the velocity→trail pipeline reacts to scroll for free.
+let baseScale = props.radius;
+let scrollLag = 0;
+// Glance offsets (radians + squash factor) — written only by the glance()
+// GSAP timeline, read by animate() and ADDED RAW to the smoothed base
+// rotation. Raw (not lerped) so the tween's easing curve — overshoot,
+// settle — reaches the screen intact instead of being low-pass filtered.
+// roll = the cute Pixar head-cock; squash = subtle squash & stretch.
+const glanceState = { yaw: 0, pitch: 0, roll: 0, squash: 0 };
+// Smoothed base rotation accumulators (mouse tilt, sway, pinned yaw/pitch).
+// mesh.rotation itself = smoothRot + glanceState → mesh is never the lerp
+// accumulator, so the raw glance add doesn't feed back into the smoothing.
+const smoothRot = { x: 0, y: 0, z: 0 };
+
 const guiParams = {
   // ── Shader / Appearance
   pixelSize: 0.004,
@@ -79,8 +129,15 @@ const guiParams = {
   idleShimmer: 0,
   // Idle breathing: gentle sinusoidal modulation of uTrail at rest.
   // Smooth because uTrail affects cell stretch geometrically (continuous shader response).
-  idleBreathAmp: 0, // amplitude of the breath on uTrail (0 = off)
+  idleBreathAmp: 0.05, // amplitude of the breath on uTrail (0 = off)
   idleBreathFreq: 0.4, // breaths per second (Hz)
+  // ── Ambient life (always-on, all modes)
+  idleFloatAmp: 7, // world-units Lissajous drift amplitude
+  idleSwayDeg: 2, // slow rotation sway amplitude (degrees)
+  breathAmp: 0.02, // scale pulsation (±2%)
+  breathFreq: 0.25, // breaths per second (Hz)
+  scrollLagMult: 1.2, // Lenis velocity (px/frame) → world-space drag
+  scrollLagMax: 50, // clamp on the scroll drag offset
   solidStart: 0.3,
   solidEnd: 3,
   trailBias: 1.5,
@@ -88,8 +145,12 @@ const guiParams = {
   // ── Motion
   followLerp: 0.3,
   posLerp: 0.2,
-  tiltAmplY: 0.15,
-  tiltAmplX: 0.6,
+  // Cursor gaze: head turns from ITS OWN position toward the cursor's point
+  // on the z=0 plane — atan2(offset, gazeDepth) saturates naturally at
+  // screen edges (~±23° at strength 0.8 / depth 600).
+  gazeStrength: 0.8,
+  gazeDepth: 600,
+  gazePinnedDamp: 0.35, // pinned anchors damp the gaze instead of killing it
   tiltLerp: 0.1,
   // ── Trail dynamics
   trailRise: 0.15,
@@ -201,11 +262,11 @@ const debouncedResize = debounce(resize, 150);
 
 const onContextLost = (e) => {
   e.preventDefault();
-  useRAFManager().unregister("three");
+  useRAFManager().unregister(rafId);
 };
 
 const onContextRestored = () => {
-  useRAFManager().register("three", animate);
+  useRAFManager().register(rafId, animate);
 };
 
 // ─── Loop ──────────────────────────────────────────────────────────────────
@@ -217,6 +278,55 @@ const animate = (now) => {
   const dt =
     lastFrameNow === 0 ? 1 : Math.min((now - lastFrameNow) / 16.667, 3);
   lastFrameNow = now;
+
+  // ── Ambient life ─────────────────────────────────────────────────────
+  // Slow Lissajous drift + layered sway + breath, computed from absolute
+  // time (frame-rate independent). All frequencies incommensurate so no
+  // pattern visibly repeats, and no cross-channel pair sits near 1:1
+  // (yaw octave 2 = 0.63 deliberately clear of floatY's 0.73).
+  const t = now / 1000;
+  const floatX = Math.sin(t * 0.51) * guiParams.idleFloatAmp;
+  const floatY = Math.sin(t * 0.73 + 1.3) * guiParams.idleFloatAmp * 0.7;
+
+  // Three incommensurate octaves per axis — a single pure sine reads as a
+  // metronome; the stack is perceptually filtered noise for 4 sins/frame.
+  const swayU = guiParams.idleSwayDeg * DEG;
+  const swayZ =
+    (Math.sin(t * 0.4) * 0.675 +
+      Math.sin(t * 0.93 + 2.1) * 0.25 +
+      Math.sin(t * 2.63 + 4.2) * 0.09) *
+    swayU;
+  const swayY =
+    (Math.sin(t * 0.27 + 0.8) * 0.35 +
+      Math.sin(t * 0.63 + 3.7) * 0.125 +
+      Math.sin(t * 1.19 + 5.1) * 0.05) *
+    swayU;
+  // Slow attention drift on pitch; its faster component is the breath below.
+  const swayX = Math.sin(t * 0.19 + 2.6) * 0.175 * swayU;
+
+  // Asymmetric breath: the 0.35 phase-distortion makes the inhale ~1.5s and
+  // the exhale ~2.5s of the 4s cycle (active in, passive out) — peak
+  // amplitude and period are exactly preserved, so no downstream re-tuning.
+  const breathPhase = t * 2 * Math.PI * guiParams.breathFreq;
+  const breathSine = Math.sin(breathPhase + 0.35 * Math.sin(breathPhase));
+  const breathScale = 1 + guiParams.breathAmp * breathSine;
+
+  // Breath → posture: chin lifts on the inhale (locked 1:1 to the scale
+  // breath), with a 0.7s-lagged micro-yaw that turns the nod into a shallow
+  // elliptical orbit — a breathing head, not a pump. Depth follows the GUI
+  // breath knob so the whole organism deepens coherently.
+  const breathK = guiParams.breathAmp / 0.02;
+  const breathPitch = -breathSine * 0.5 * DEG * breathK;
+  const breathYaw = Math.sin(breathPhase - 1.1) * 0.12 * DEG * breathK;
+
+  // Scroll drag: Lenis' smoothed velocity pulls the smiley against the
+  // scroll direction; the lerp brings it back to rest once scrolling stops.
+  const scrollVelo = $lenis ? $lenis.velocity || 0 : 0;
+  const lagTarget = Math.max(
+    -guiParams.scrollLagMax,
+    Math.min(guiParams.scrollLagMax, -scrollVelo * guiParams.scrollLagMult),
+  );
+  scrollLag += (lagTarget - scrollLag) * Math.min(0.08 * dt, 1);
 
   if (isScrubbing.value) {
     // GSAP scrub drives position directly — just copy target
@@ -246,20 +356,27 @@ const animate = (now) => {
     const ox = (followMouse.x - 0.5) * guiParams.hoverOffset;
     const oy = (followMouse.y - 0.5) * guiParams.hoverOffset;
 
-    // Base from DOM tracker + hover offset → real delta for velocity pipeline
-    mesh.position.x = trackedBase.x + ox;
-    mesh.position.y = trackedBase.y + oy;
-    mesh.scale.setScalar(trackedBase.scale);
+    // Base from DOM tracker + hover offset → real delta for velocity pipeline.
+    // Ambient float is dialed down: the anchor leads, life stays subtle.
+    mesh.position.x = trackedBase.x + ox + floatX * 0.25;
+    mesh.position.y = trackedBase.y + oy + floatY * 0.25;
+    baseScale = trackedBase.scale;
   } else {
     // ── Mouse follow mode ─────────────────────────────────────────────────
     followMouse.x += (mouse.x - followMouse.x) * guiParams.followLerp;
     followMouse.y += (mouse.y - followMouse.y) * guiParams.followLerp;
 
-    const tx = (followMouse.x - 0.5) * props.followRange;
-    const ty = (followMouse.y - 0.5) * props.followRange;
+    const tx = (followMouse.x - 0.5) * props.followRange + floatX;
+    const ty = (followMouse.y - 0.5) * props.followRange + floatY + scrollLag;
     mesh.position.x += (tx - mesh.position.x) * guiParams.posLerp;
     mesh.position.y += (ty - mesh.position.y) * guiParams.posLerp;
   }
+
+  // Breath + glance squash applied on top of whatever scale the current mode
+  // wants — single writer for mesh.scale, all modes stay alive.
+  const s = baseScale * breathScale;
+  const sq = glanceState.squash;
+  mesh.scale.set(s * (1 - sq), s * (1 + sq), s);
 
   // Velocity tracking
   const vx = mesh.position.x - prevPos.x;
@@ -326,20 +443,62 @@ const animate = (now) => {
       : guiParams.idleShimmer) * dt;
   for (const m of meshes) m.material.uniforms.uTick.value = tickCounter;
 
-  // Subtle tilt toward mouse
-  const baseRotX = (guiParams.rotX * Math.PI) / 180;
-  const baseRotY = (guiParams.rotY * Math.PI) / 180;
-  const baseRotZ = (guiParams.rotZ * Math.PI) / 180;
+  // Subtle tilt toward mouse. If the tracked element pins a yaw or pitch
+  // ("data-smiley-yaw" / "data-smiley-pitch" in degrees), they become the
+  // BASE rotation — mouse tilt is still added on top so the smiley stays
+  // alive while facing the desired direction.
+  const baseRotZ = (guiParams.rotZ * Math.PI) / 180 + swayZ;
 
-  mesh.rotation.y +=
-    (baseRotY + (followMouse.x - 0.5) * guiParams.tiltAmplY - mesh.rotation.y) *
-    guiParams.tiltLerp;
-  mesh.rotation.x +=
-    (baseRotX +
-      (followMouse.y - 0.5) * -guiParams.tiltAmplX -
-      mesh.rotation.x) *
-    guiParams.tiltLerp;
-  mesh.rotation.z += (baseRotZ - mesh.rotation.z) * guiParams.tiltLerp;
+  const pinnedYawDeg =
+    isTracking.value && trackedEl
+      ? parseFloat(trackedEl.dataset.smileyYaw)
+      : NaN;
+  const baseRotY = !Number.isNaN(pinnedYawDeg)
+    ? (pinnedYawDeg * Math.PI) / 180
+    : (guiParams.rotY * Math.PI) / 180;
+
+  const pinnedPitchDeg =
+    isTracking.value && trackedEl
+      ? parseFloat(trackedEl.dataset.smileyPitch)
+      : NaN;
+  const baseRotX = !Number.isNaN(pinnedPitchDeg)
+    ? (pinnedPitchDeg * Math.PI) / 180
+    : (guiParams.rotX * Math.PI) / 180;
+
+  // True cursor gaze: angle from the smiley's own position to the cursor's
+  // point on the z=0 plane — it looks AT the cursor, wherever it stands,
+  // not "tilts relative to viewport center". atan2 saturates at the edges.
+  // Pinned axes DAMP the gaze instead of killing it: the head stays biased
+  // toward its designed pose but keeps acknowledging the cursor.
+  const cursorX = (followMouse.x - 0.5) * viewportWorldH * camera.aspect;
+  const cursorY = (followMouse.y - 0.5) * viewportWorldH;
+  const gazeYaw =
+    Math.atan2(cursorX - mesh.position.x, guiParams.gazeDepth) *
+    guiParams.gazeStrength;
+  const gazePitch =
+    -Math.atan2(cursorY - mesh.position.y, guiParams.gazeDepth) *
+    guiParams.gazeStrength;
+  const mouseTiltY = Number.isNaN(pinnedYawDeg)
+    ? gazeYaw
+    : gazeYaw * guiParams.gazePinnedDamp;
+  const mouseTiltX = Number.isNaN(pinnedPitchDeg)
+    ? gazePitch
+    : gazePitch * guiParams.gazePinnedDamp;
+
+  // Base rotation is smoothed (mouse tilt, sway, pinned axes); glance tween
+  // offsets are added RAW so their easing personality survives untouched.
+  // Smoothing factor is frame-rate corrected: dt is normalized to 60fps
+  // frames, so this equals tiltLerp/frame at 60fps and stays identical in
+  // feel at 90/120/144Hz.
+  const rotEase = 1 - Math.pow(1 - guiParams.tiltLerp, dt);
+  smoothRot.y +=
+    (baseRotY + mouseTiltY + swayY + breathYaw - smoothRot.y) * rotEase;
+  smoothRot.x +=
+    (baseRotX + mouseTiltX + swayX + breathPitch - smoothRot.x) * rotEase;
+  smoothRot.z += (baseRotZ - smoothRot.z) * rotEase;
+  mesh.rotation.y = smoothRot.y + glanceState.yaw;
+  mesh.rotation.x = smoothRot.x + glanceState.pitch;
+  mesh.rotation.z = smoothRot.z + glanceState.roll;
 
   // Skip render when nothing visible has changed since last paint.
   // Tracking/scrubbing modes always render — they're DOM-driven and the
@@ -407,6 +566,7 @@ const init = () => {
 
   camera = new THREE.PerspectiveCamera(45, w / h, 0.1, 2000);
   camera.position.set(0, 0, 450);
+  viewportWorldH = 2 * camera.position.z * Math.tan((camera.fov * DEG) / 2);
 
   // ── Shared material factory ────────────────────────────────────────
   const makeMaterial = (color) =>
@@ -579,7 +739,7 @@ const init = () => {
         const props = {
           duration,
           ease: "power2.out",
-          overwrite: true,
+          overwrite: "auto",
           onUpdate: () => {
             forceRender = true;
           },
@@ -589,6 +749,7 @@ const init = () => {
         }
         return new Promise((resolve) => {
           props.onComplete = resolve;
+          props.onInterrupt = resolve;
           gsap.to(mouthMesh.morphTargetInfluences, props);
         });
       };
@@ -609,6 +770,9 @@ const init = () => {
         triggerWink: async () => {
           await wink();
           syncSliders();
+        },
+        triggerGlance: async () => {
+          await glance(Math.random() < 0.5 ? -22 : 22, { pitchDeg: -4 });
         },
         resetToBasis: async () => {
           await revertToBasis(0.3);
@@ -631,6 +795,7 @@ const init = () => {
       fExpr.add(exprActions, "triggerShock").name("→ Shock! (auto-revert)");
       fExpr.add(exprActions, "triggerHappy").name("→ Happy! (auto-revert)");
       fExpr.add(exprActions, "triggerWink").name("→ Wink! (rapid)");
+      fExpr.add(exprActions, "triggerGlance").name("→ Glance (side look)");
       fExpr.add(exprActions, "resetToBasis").name("↺ Reset to Basis");
       fExpr.open(true);
 
@@ -640,17 +805,65 @@ const init = () => {
         .add(guiParams, "followLerp", 0.01, 0.3, 0.005)
         .name("Mouse follow");
       fMotion.add(guiParams, "posLerp", 0.01, 0.2, 0.005).name("Pos lerp");
-      fMotion.add(guiParams, "tiltAmplY", 0.0, 0.6, 0.01).name("Tilt X-axis");
-      fMotion.add(guiParams, "tiltAmplX", 0.0, 0.6, 0.01).name("Tilt Y-axis");
+      fMotion
+        .add(guiParams, "gazeStrength", 0, 1.5, 0.05)
+        .name("Gaze strength");
+      fMotion.add(guiParams, "gazeDepth", 200, 1200, 10).name("Gaze depth");
+      fMotion
+        .add(guiParams, "gazePinnedDamp", 0, 1, 0.05)
+        .name("Gaze (pinned)");
       fMotion.add(guiParams, "tiltLerp", 0.01, 0.2, 0.005).name("Tilt speed");
       fMotion.open(false);
+
+      // ── Ambient life ───────────────────────────────────────────────────
+      const fAmbient = gui.addFolder("≋ Ambient life");
+      fAmbient.add(guiParams, "idleFloatAmp", 0, 20, 0.5).name("Float amp");
+      fAmbient.add(guiParams, "idleSwayDeg", 0, 8, 0.1).name("Sway (deg)");
+      fAmbient.add(guiParams, "breathAmp", 0, 0.08, 0.002).name("Breath amp");
+      fAmbient.add(guiParams, "breathFreq", 0.05, 1, 0.01).name("Breath Hz");
+      fAmbient.add(guiParams, "scrollLagMult", 0, 4, 0.1).name("Scroll lag");
+      fAmbient.add(guiParams, "scrollLagMax", 0, 120, 1).name("Lag clamp");
+      fAmbient.open(true);
 
       // ── Rotation ──────────────────────────────────────────────────
       const fRot = gui.addFolder("↺ Rotation");
       fRot.add(guiParams, "rotX", -180, 180, 1).name("Rot X");
       fRot.add(guiParams, "rotY", -180, 180, 1).name("Rot Y");
       fRot.add(guiParams, "rotZ", -180, 180, 1).name("Rot Z");
-      fRot.open(false);
+
+      // Live-tune the yaw / pitch of the currently tracked element (writes
+      // to its data-smiley-yaw / data-smiley-pitch attributes, picked up by
+      // animate() each frame). Useful to dial in "look-at-X" framing per anchor.
+      const trackedRotState = { trackedYaw: 0, trackedPitch: 0 };
+      const refreshTrackedRot = () => {
+        if (trackedEl) {
+          const yaw = parseFloat(trackedEl.dataset.smileyYaw);
+          const pitch = parseFloat(trackedEl.dataset.smileyPitch);
+          trackedRotState.trackedYaw = Number.isNaN(yaw) ? 0 : yaw;
+          trackedRotState.trackedPitch = Number.isNaN(pitch) ? 0 : pitch;
+          fRot.controllers.forEach((c) => c.updateDisplay());
+        }
+      };
+      fRot
+        .add(trackedRotState, "trackedYaw", -90, 90, 1)
+        .name("Tracked yaw")
+        .onChange((v) => {
+          if (trackedEl) {
+            trackedEl.dataset.smileyYaw = String(v);
+            forceRender = true;
+          }
+        });
+      fRot
+        .add(trackedRotState, "trackedPitch", -90, 90, 1)
+        .name("Tracked pitch")
+        .onChange((v) => {
+          if (trackedEl) {
+            trackedEl.dataset.smileyPitch = String(v);
+            forceRender = true;
+          }
+        });
+      refreshTrackedRot();
+      fRot.open(true);
 
       // ── Color ──────────────────────────────────────────────────────────
       gui
@@ -669,7 +882,7 @@ const init = () => {
     });
   }
 
-  useRAFManager().register("three", animate);
+  useRAFManager().register(rafId, animate);
 };
 
 // ─── Reduced motion: skip init entirely ────────────────────────────────────
@@ -771,7 +984,11 @@ const setExpression = (name, value = 1, opts = {}) => {
     [targetIdx]: value,
     duration,
     ease,
-    overwrite: true,
+    // "auto" kills only tweens touching the SAME indices — a blanket `true`
+    // would kill every in-flight morph tween on the shared influences array
+    // (their promises would hang without onInterrupt, starving the ambient
+    // scheduler chains).
+    overwrite: "auto",
     onUpdate: () => {
       forceRender = true;
     },
@@ -786,6 +1003,7 @@ const setExpression = (name, value = 1, opts = {}) => {
 
   return new Promise((resolve) => {
     tweenProps.onComplete = resolve;
+    tweenProps.onInterrupt = resolve;
     gsap.to(mouthMesh.morphTargetInfluences, tweenProps);
   });
 };
@@ -813,7 +1031,7 @@ const wink = (opts = {}) => {
   } = opts;
 
   return new Promise((resolve) => {
-    const tl = gsap.timeline({ onComplete: resolve });
+    const tl = gsap.timeline({ onComplete: resolve, onInterrupt: resolve });
     tl.to(mouthMesh.morphTargetInfluences, {
       [idx]: 1,
       duration: closeDuration,
@@ -836,6 +1054,224 @@ const wink = (opts = {}) => {
   });
 };
 
+// Single owner of glanceState — a new gesture kills the previous timeline
+// and tweens from current values (continuous, no snap).
+let glanceTl = null;
+
+/**
+ * Pixar-style head cock, five acts on one timeline:
+ * anticipation gather → yaw leads / pitch follows / roll trails & hangs on
+ * its overshoot plateau (the signature) → velocity-slaved stretch →
+ * moving hold ("listening" drift) → asymmetric return, roll last out with
+ * a single soft counter-sway.
+ * Beats join at zero velocity — no overwrite juggling needed. The tween
+ * writes glanceState only; animate() adds it raw on top of the smoothed
+ * base rotation, so mouse tilt keeps working during the glance.
+ *
+ *   smiley.glance(22)                              → curious look right
+ *   smiley.glance(-20, { pitchDeg: -5 })           → look left, slightly up
+ *   smiley.glance(5, { rollDeg: -14 })             → pure head-cock
+ */
+const glance = (yawDeg = 22, opts = {}) => {
+  const {
+    pitchDeg = 0,
+    // Head tilts toward the side it looks at (negative z = clockwise on
+    // screen for a positive/right yaw) — the "curious puppy" pose.
+    rollDeg = -yawDeg * 0.55,
+    holdDuration = 0.9,
+    // Per-take tempo (±6% timeScale): genuine take-to-take variation
+    // without touching the signature curves. Wider than 6% reads perky or
+    // draggy against this character's languid personality.
+    tempo = gsap.utils.random(0.94, 1.06),
+    // Facial accents anchored to timeline positions ({at: seconds | 'return',
+    // fn}) — they live and die WITH the gesture: a kill removes pending
+    // accents atomically, tab-hidden pauses delay them in sync, and
+    // timeScale keeps them on-beat (positions are timeline-local).
+    accents = [],
+  } = opts;
+
+  const Y = yawDeg * DEG;
+  const P = pitchDeg * DEG;
+  const R = rollDeg * DEG;
+  // Squash slaved to gesture size: a 5° cock whispers, a 26° glance pops.
+  const squashAmp = Math.min(
+    0.05,
+    0.03 + (0.02 * Math.max(Math.abs(yawDeg), Math.abs(rollDeg))) / 28,
+  );
+
+  // ── Per-take variation — decided at BUILD time, never in-take tremor.
+  // Amplitudes jitter; durations never (zero-velocity joins depend on them).
+  const chinDip = gsap.utils.random(1.0, 2.0) * DEG;
+  // Arc scoop: on wide, level/upward turns the head dips through the travel
+  // (figure-8 lobe) — lowest just after it is fastest. Downward finals skip
+  // it (would read as pitch overshoot); ~35% of side glances skip → free
+  // take-to-take variety through omission.
+  const scoop = Math.abs(yawDeg) >= 10 && P <= 0.5 * DEG;
+  const dipAmp = scoop
+    ? (0.8 + (1.2 * Math.min(Math.abs(yawDeg), 26)) / 26) *
+      DEG *
+      gsap.utils.random(0.8, 1.2)
+    : 0;
+  // Settle correction: most takes touch the pose twice (a beat, then a tiny
+  // lock-on nudge); ~35% land clean so the correction never becomes its own
+  // pattern.
+  const settle = holdDuration >= 0.85 && Math.random() < 0.65;
+  const nudge = settle ? gsap.utils.random(0.012, 0.025) : 0;
+  const yawDriftMult = gsap.utils.random(0.955, 0.985);
+  const rollDriftMult = gsap.utils.random(1.05, 1.11);
+  const craneDeg = gsap.utils.random(-1.4, -0.6);
+
+  // Chained retarget (a glance is already in flight — e.g. hovering CTAs in
+  // succession): kill and retween FROM current values, and skip the
+  // anticipation — the gather is the charm of a gesture from rest, but on a
+  // retarget it reads as stutter. Direct feedback must be immediate.
+  const chained = !!glanceTl?.isActive();
+  const t0 = chained ? 0 : 0.18; // when the turn starts
+  const poseLands = t0 + 0.63; // roll landing — accent anchor "pose"
+  const returnAt = poseLands + holdDuration; // accent anchor "return"
+
+  glanceTl?.kill();
+  return new Promise((resolve) => {
+    glanceTl = gsap.timeline({
+      onComplete: resolve,
+      onInterrupt: resolve,
+      // Plateau hang, moving hold and settle tail move ~0.0002 rad/frame —
+      // below the dirty-check epsilon. Force render so they never step.
+      onUpdate: () => {
+        forceRender = true;
+      },
+    });
+
+    // 1 — anticipation: gather + counter-tilt, compress into the neck.
+    // Yaw counter skipped on pure head-cocks (reads as jitter under 10°).
+    if (!chained) {
+      glanceTl.to(
+        glanceState,
+        {
+          yaw:
+            Math.abs(yawDeg) >= 10 ? Y * gsap.utils.random(-0.09, -0.15) : 0,
+          roll: R * gsap.utils.random(-0.14, -0.22),
+          pitch: chinDip,
+          squash: gsap.utils.random(-0.014, -0.022),
+          duration: 0.18,
+          ease: "sine.inOut",
+        },
+        0,
+      );
+    }
+    // 2 — turn: yaw leads (eyes direct attention first), whisper overshoot
+    glanceTl.to(glanceState, { yaw: Y, duration: 0.42, ease: "joyeTurn" }, t0);
+    // 3 — pitch: arc scoop through wide turns (bottoms ~40ms after peak yaw
+    // velocity — drag), or the straight decisive ease on head-cocks.
+    // Deliberately no overshoot either way (three overshooting axes = jelly).
+    if (scoop) {
+      glanceTl.to(
+        glanceState,
+        { pitch: chinDip + dipAmp, duration: 0.15, ease: "sine.inOut" },
+        t0 + 0.02,
+      );
+      glanceTl.to(
+        glanceState,
+        { pitch: P, duration: 0.35, ease: "power2.inOut" },
+        t0 + 0.17,
+      );
+    } else {
+      glanceTl.to(
+        glanceState,
+        { pitch: P, duration: 0.5, ease: "power3.out" },
+        t0 + 0.02,
+      );
+    }
+    // 4 — roll trails 80ms behind, lasts longer, hangs on its plateau —
+    // the trailing tilt traces an arc: the curious-puppy tell
+    glanceTl.to(
+      glanceState,
+      { roll: R, duration: 0.55, ease: "joyeCock" },
+      t0 + 0.08,
+    );
+    // 5 — stretch springs from the gather, peaking at max angular velocity
+    glanceTl.to(
+      glanceState,
+      { squash: squashAmp, duration: 0.18, ease: "sine.out" },
+      t0,
+    );
+    // 6 — stretch fully gone a hair before the pose lands: the held pose
+    // is a clean sphere
+    glanceTl.to(
+      glanceState,
+      { squash: 0, duration: 0.44, ease: "power2.inOut" },
+      t0 + 0.18,
+    );
+    // 7 — moving hold, per channel: roll sinks deeper, pitch cranes toward
+    // the viewer ("listening", never frozen), and yaw either locks on with
+    // a settle nudge after a 0.12s beat, or relaxes in one motion.
+    glanceTl.to(
+      glanceState,
+      { roll: R * rollDriftMult, duration: holdDuration, ease: "sine.inOut" },
+      poseLands,
+    );
+    glanceTl.to(
+      glanceState,
+      { pitch: P + craneDeg * DEG, duration: holdDuration, ease: "sine.inOut" },
+      poseLands,
+    );
+    if (settle) {
+      glanceTl.to(
+        glanceState,
+        { yaw: Y * (1 + nudge), duration: 0.26, ease: "sine.inOut" },
+        poseLands + 0.12,
+      );
+      glanceTl.to(
+        glanceState,
+        {
+          yaw: Y * yawDriftMult,
+          duration: holdDuration - 0.38,
+          ease: "sine.inOut",
+        },
+        poseLands + 0.38,
+      );
+    } else {
+      glanceTl.to(
+        glanceState,
+        { yaw: Y * yawDriftMult, duration: holdDuration, ease: "sine.inOut" },
+        poseLands,
+      );
+    }
+    // 8 — return: heavier than the outbound (energy dissipated). Absolute
+    // anchor: with per-channel hold tweens, ">" would be insertion-order
+    // dependent.
+    glanceTl.to(
+      glanceState,
+      { yaw: 0, pitch: 0, duration: 0.8, ease: "joyeRelease" },
+      returnAt,
+    );
+    // 9 — roll last in, last out: crosses neutral ~4% once and lands dead —
+    // the closing punctuation of the gesture
+    glanceTl.to(
+      glanceState,
+      { roll: 0, duration: 0.95, ease: "joyeSettle" },
+      returnAt + 0.1,
+    );
+
+    // Facial accents ride the timeline itself: paused with it (hidden tab),
+    // killed with it (interrupt) — never a wall-clock timer. Semantic
+    // anchors resolve against THIS take's timing (chained takes land early).
+    for (const a of accents) {
+      const pos =
+        a.at === "pose"
+          ? poseLands
+          : a.at === "hold"
+            ? poseLands + 0.2
+            : a.at === "return"
+              ? returnAt
+              : a.at;
+      glanceTl.call(a.fn, [], pos);
+    }
+
+    glanceTl.timeScale(tempo);
+  });
+};
+
 defineExpose({
   startTracking,
   stopTracking,
@@ -847,6 +1283,7 @@ defineExpose({
   clearScrub,
   setExpression,
   wink,
+  glance,
   getCamera: () => camera,
   getRenderer: () => renderer,
 });
@@ -857,8 +1294,9 @@ onMounted(() => {
 });
 
 onBeforeUnmount(() => {
-  useRAFManager().unregister("three");
+  useRAFManager().unregister(rafId);
   stopTracking();
+  glanceTl?.kill();
   gui?.destroy();
   window.removeEventListener("resize", debouncedResize);
   window.removeEventListener("pointermove", onPointerMove);
@@ -867,9 +1305,10 @@ onBeforeUnmount(() => {
     "webglcontextrestored",
     onContextRestored,
   );
-  geometry?.dispose();
-  for (const m of meshes) m.material?.dispose();
-  for (const m of featureMeshes) m.material?.dispose();
+  for (const m of [...meshes, ...featureMeshes]) {
+    m.geometry?.dispose();
+    m.material?.dispose();
+  }
   renderer?.dispose();
   renderer?.domElement?.parentNode?.removeChild(renderer.domElement);
 });

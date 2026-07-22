@@ -145,7 +145,11 @@
             />
           </svg>
         </div>
-        <div ref="buttonWrapperRef" class="button-wrapper">
+        <div
+          ref="buttonWrapperRef"
+          class="button-wrapper"
+          @mouseenter="smiley.notice($event.currentTarget as HTMLElement)"
+        >
           <ButtonComponent
             href="/process"
             label="View projects"
@@ -163,9 +167,12 @@ import ButtonComponent from "../layout/ButtonComponent.vue";
 import HomeBgGrid from "~/components/home/HomeBgGrid.vue";
 import { setupHeroGridDissolve } from "~/animations/heroGridDissolve";
 import { useGSAP } from "~/composables/useGSAP";
+import { useSmiley } from "~/composables/useSmiley";
 import type { PageEnterHook } from "~/composables/usePageTransition";
 
 // ── Refs ────────────────────────────────────────────────────────────────────
+const smiley = useSmiley();
+
 const sectionRef = useTemplateRef<HTMLElement>("sectionRef");
 const homeBgGridRef = useTemplateRef<{
   getGridData: () => {

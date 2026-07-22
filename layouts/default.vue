@@ -14,10 +14,14 @@
 </template>
 
 <script lang="ts" setup>
-import { ref, provide, onMounted, onUnmounted } from "vue";
+import { ref, onMounted, onUnmounted } from "vue";
 import Footer from "~/components/layout/Footer.vue";
 import Header from "~/components/layout/Header.vue";
-import type { SmileyAPI } from "~/types/smiley";
+import { useSmileyAmbient } from "~/composables/useSmileyAmbient";
+
+// Ambient idle life for the smiley (winks, glances, scroll reactions).
+// Must live in a child of app.vue so inject("pixelBlob") resolves.
+useSmileyAmbient();
 
 const showGrid = ref(false);
 

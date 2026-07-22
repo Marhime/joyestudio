@@ -33,7 +33,8 @@ export const BP = {
  *   })
  */
 export function useGSAP() {
-  const { $gsap, $ScrollTrigger, $Flip, $SplitText } = useNuxtApp();
+  const { $gsap, $ScrollTrigger, $Flip, $SplitText, $GSDevTools } =
+    useNuxtApp();
 
   // One matchMedia instance per component — GSAP owns the cleanup
   const mm = $gsap.matchMedia();
@@ -48,5 +49,6 @@ export function useGSAP() {
     mm,
     BP,
     scheduleRefresh,
+    GSDevTools: $GSDevTools,
   };
 }

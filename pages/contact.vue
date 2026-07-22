@@ -8,7 +8,17 @@
           >ther!
         </h1>
       </div>
-      <div contact-smiley-anchor class="contact-smiley-anchor"></div>
+      <!-- Pinned pose kept gentle: past ~±20° the flat face features slide
+           toward the sphere's silhouette and foreshorten (read as deformed).
+           -16/12 still looks toward the form, face fully readable. -->
+      <div
+        ref="anchorRef"
+        contact-smiley-anchor
+        data-smiley-scale="1"
+        data-smiley-yaw="-16"
+        data-smiley-pitch="12"
+        class="contact-smiley-anchor"
+      ></div>
     </div>
     <div ref="formRef">
       <InteractiveForm ref="interactiveFormRef" />
@@ -21,23 +31,31 @@
 import InteractiveForm from "~/components/contact/InteractiveForm.vue";
 import type { PageEnterHook } from "~/composables/usePageTransition";
 import { useGSAP } from "~/composables/useGSAP";
+import { useSmiley } from "~/composables/useSmiley";
 
 // ── Refs ───────────────────────────────────────────────────────────────────────
 const pageRef = useTemplateRef<HTMLElement>("pageRef");
 const headingRef = useTemplateRef<HTMLElement>("headingRef");
 const formRef = useTemplateRef<HTMLElement>("formRef");
+const anchorRef = useTemplateRef<HTMLElement>("anchorRef");
 const interactiveFormRef = useTemplateRef<{ start: () => void }>(
   "interactiveFormRef",
 );
 
 // ── GSAP ───────────────────────────────────────────────────────────────────────
 const { gsap, mm, BP, scheduleRefresh } = useGSAP();
+const smiley = useSmiley();
 
 // ── Page enter hook (provided by app.vue via usePageTransition) ────────────────
 const onPageEnter = inject<PageEnterHook>("onPageEnter")!;
 
 onMounted(() => {
   nextTick(() => {
+    // Track the smiley anchor immediately so the smiley doesn't flash at the
+    // viewport center on direct page load (before InteractiveForm.start()
+    // fires its own track() ~1.5s into the entrance timeline).
+    if (anchorRef.value) smiley.track(anchorRef.value);
+
     // ① Initial hidden states — set while grid covers the screen.
     //    Must be inside mm.add so they're breakpoint-aware and auto-reverted.
     mm.add(BP.desktop, () => {
@@ -143,9 +161,14 @@ definePageMeta({
 
     .contact-smiley-anchor {
       display: block;
-      grid-column: 9 / 13;
-      align-self: start;
-      height: 10rem;
+      position: absolute;
+      width: 45rem;
+      height: 45rem;
+      margin-left: auto;
+      margin-top: 2rem;
+      right: 0;
+      top: 35%;
+      transform: translate(-30%, -50%);
     }
   }
 }

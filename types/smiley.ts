@@ -39,6 +39,44 @@ export interface SmileyWinkOptions {
   openDuration?: number;
 }
 
+/**
+ * A facial accent anchored to the glance timeline. `at` is a semantic
+ * anchor — 'pose' (the roll landing), 'hold' (0.2s into the moving hold),
+ * 'return' (the instant the head starts back) — or a raw timeline position
+ * in seconds. Semantic anchors are preferred: they stay correct when a
+ * chained take skips the anticipation and lands early. Placed with
+ * tl.call() inside the gesture, so accents pause with a hidden tab and die
+ * with an interrupted gesture.
+ */
+export interface SmileyGlanceAccent {
+  at: number | "pose" | "hold" | "return";
+  fn: () => void;
+}
+
+export interface SmileyGlanceOptions {
+  /** Vertical look component in degrees, positive = down (default: 0). */
+  pitchDeg?: number;
+  /**
+   * Head-cock tilt in degrees (rotation.z offset). Defaults to
+   * -yawDeg * 0.55 so the head tilts toward the side it looks at.
+   */
+  rollDeg?: number;
+  /**
+   * Moving-hold duration at the pose (seconds, default: 0.9).
+   * Beat timing and eases are fixed — they are the character's signature;
+   * randomize amplitude, side and hold only. Squash is derived from
+   * gesture size.
+   */
+  holdDuration?: number;
+  /** Facial accents anchored to timeline positions. */
+  accents?: SmileyGlanceAccent[];
+  /**
+   * Per-take timeScale (default: random 0.94-1.06). Accents scale with it —
+   * their positions are timeline-local.
+   */
+  tempo?: number;
+}
+
 /** Names of available shape-key expressions in the GLB. Extend as more are added. */
 export type SmileyExpression = "shocked" | "happy" | "wink";
 
@@ -107,6 +145,13 @@ export interface SmileyAPI {
    * the returned Promise resolves when the eye is fully reopened.
    */
   wink: (opts?: SmileyWinkOptions) => Promise<void>;
+
+  /**
+   * Side glance: turn the head toward a side (yaw in degrees, positive =
+   * right), hold briefly, then settle back to neutral. Mouse tilt keeps
+   * working on top during the glance.
+   */
+  glance: (yawDeg?: number, opts?: SmileyGlanceOptions) => Promise<void>;
 
   /** Access the Three.js camera for domRectToWorld calculations. */
   getCamera: () => any;

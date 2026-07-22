@@ -1,5 +1,11 @@
 import { inject, computed } from "vue";
 import type { Ref } from "vue";
+import {
+  canTriggerSmileyAction,
+  markSmileyAction,
+  beginSmileyGesture,
+  endSmileyGesture,
+} from "./useSmileyCooldown";
 import type {
   SmileyAPI,
   SmileyMode,
@@ -8,6 +14,8 @@ import type {
   SmileyExpression,
   SmileyExpressionOptions,
   SmileyWinkOptions,
+  SmileyGlanceOptions,
+  SmileyGlanceAccent,
 } from "~/types/smiley";
 
 /**
@@ -111,6 +119,41 @@ export function useSmiley() {
      */
     wink: (opts?: SmileyWinkOptions): Promise<void> =>
       api()?.wink(opts) ?? Promise.resolve(),
+
+    /**
+     * Side glance — turn the head toward a side (yaw in degrees, positive =
+     * right), hold, then settle back to neutral.
+     *   smiley.glance(22)                     → look right
+     *   smiley.glance(-20, { pitchDeg: -5 })  → look left, slightly up
+     */
+    glance: (yawDeg?: number, opts?: SmileyGlanceOptions): Promise<void> =>
+      api()?.glance(yawDeg, opts) ?? Promise.resolve(),
+
+    /**
+     * UI acknowledgment: the smiley glances toward the given element —
+     * "I see what you're about to do". Direct feedback is NEVER
+     * cooldown-gated: successive hovers chain, each retargeting the look
+     * from the current pose (the anticipation is skipped on chained takes).
+     * Only the wink accent stays cooldown-rare so sweeps don't wink-spam.
+     *   <li @mouseenter="smiley.notice($event.currentTarget)">
+     */
+    notice: (el: HTMLElement): void => {
+      const a = api();
+      if (!a) return;
+      const r = el.getBoundingClientRect();
+      const side = r.left + r.width / 2 < window.innerWidth / 2 ? -1 : 1;
+      const above = r.top + r.height / 2 < window.innerHeight / 2;
+      const accents: SmileyGlanceAccent[] = canTriggerSmileyAction()
+        ? [{ at: "pose", fn: () => a.wink() }]
+        : [];
+      markSmileyAction(); // push ambient gestures away from the interaction
+      beginSmileyGesture();
+      a.glance(side * 12, {
+        pitchDeg: above ? -6 : 4,
+        holdDuration: 0.5,
+        accents,
+      }).finally(endSmileyGesture);
+    },
 
     /** Access the Three.js camera for domRectToWorld calculations. */
     getCamera: () => api()?.getCamera() ?? null,

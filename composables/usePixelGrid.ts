@@ -137,7 +137,7 @@ export function usePixelGrid() {
         duration,
         ease,
         overwrite: true,
-        stagger: { from: [0, 1], amount: stagger, grid: "auto" },
+        stagger: { from: "random", amount: stagger },
         onComplete: resolve,
       });
     });
@@ -170,7 +170,7 @@ export function usePixelGrid() {
         duration,
         ease,
         overwrite: true,
-        stagger: { from: [1, 0], amount: stagger, grid: "auto" },
+        stagger: { from: "random", amount: stagger },
         onComplete: () => {
           // Hide the overlay container — grid is invisible until the next transition
           if (_overlay.value) gsap.set(_overlay.value, { autoAlpha: 0 });

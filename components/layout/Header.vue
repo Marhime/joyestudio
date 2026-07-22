@@ -6,16 +6,16 @@
         <!-- Menu -->
         <div class="header-menu">
           <ul class="menu-list">
-            <li>
+            <li @mouseenter="onNavHover">
               <LinkComponent label="About us" href="/" />
             </li>
-            <li>
+            <li @mouseenter="onNavHover">
               <LinkComponent label="Projects" href="/typography" />
             </li>
-            <li>
+            <li @mouseenter="onNavHover">
               <LinkComponent label="Services" href="/grid-editor" />
             </li>
-            <li>
+            <li @mouseenter="onNavHover">
               <LinkComponent label="Contact" href="/contact" />
             </li>
           </ul>
@@ -88,7 +88,7 @@
         </div>
 
         <!-- Contact button -->
-        <div class="header-contact">
+        <div class="header-contact" @mouseenter="onNavHover">
           <ButtonComponent
             href="/contact"
             label="Book a call"
@@ -104,6 +104,7 @@
 import { ref } from "vue";
 import ButtonComponent from "./ButtonComponent.vue";
 import LinkComponent from "./LinkComponent.vue";
+import { useSmiley } from "~/composables/useSmiley";
 
 const props = defineProps<{
   theme?: "light" | "dark";
@@ -111,6 +112,15 @@ const props = defineProps<{
 
 const { currentTheme, changeThemeTo } = useThemeStore();
 const isScrolled = ref(false);
+
+// Smiley reaction: brief wink whenever the user hovers a nav link or CTA.
+// Cooldown prevents spam if the user sweeps across the menu.
+const smiley = useSmiley();
+const onNavHover = (e: MouseEvent) => {
+  // Look toward the hovered nav item, wink as the pose lands —
+  // acknowledgment, not just a reflex. Cooldown-gated inside notice().
+  smiley.notice(e.currentTarget as HTMLElement);
+};
 
 // Fonction pour détecter le scroll
 const handleScroll = () => {

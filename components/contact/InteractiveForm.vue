@@ -16,6 +16,7 @@
           v-model="form.name"
           maxlength="25"
           autocomplete="off"
+          @keydown="onTyping"
           @keydown.enter.prevent="validateStep(1)"
         />
         <span v-if="form.name && currentStep > 1">.</span>
@@ -81,6 +82,7 @@
           v-model="form.timeline"
           maxlength="20"
           autocomplete="off"
+          @keydown="onTyping"
           @keydown.enter.prevent="validateStep(3)"
         />
         <span v-if="!form.timeline" class="input-hint" aria-hidden="true"
@@ -140,6 +142,7 @@
           type="email"
           v-model="form.email"
           autocomplete="off"
+          @keydown="onTyping"
           @keydown.enter.prevent="validateStep(5)"
         />
         <span v-if="!form.email" class="input-hint" aria-hidden="true"
@@ -176,6 +179,28 @@ import { ref, watch, nextTick, onMounted, onUnmounted } from "vue";
 // ── Composables ───────────────────────────────────────────────────────────────
 const { gsap, mm, BP, scheduleRefresh } = useGSAP();
 const smiley = useSmiley();
+
+// ── Smiley reaction on typing ─────────────────────────────────────────────────
+// FULL shocked spike on every printable keystroke. No cooldown — every key
+// triggers a complete reaction. GSAP's overwrite handles fast typing cleanly:
+// each new keystroke restarts the "in" tween from the current value, and the
+// "out" tween only fires after typing pauses (the last "in" tween completes).
+const onTyping = (e: KeyboardEvent) => {
+  if (e.key.length !== 1) return; // skip Shift, Arrow, Enter, etc.
+  smiley
+    .setExpression("shocked", 1, {
+      duration: 0.14,
+      ease: "power2.out",
+      exclusive: false,
+    })
+    .then(() =>
+      smiley.setExpression("shocked", 0, {
+        duration: 0.35,
+        ease: "power2.out",
+        exclusive: false,
+      }),
+    );
+};
 
 // ── Template refs ─────────────────────────────────────────────────────────────
 const formRef = useTemplateRef<HTMLFormElement>("formRef");
