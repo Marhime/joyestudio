@@ -16,6 +16,7 @@ import type {
   SmileyWinkOptions,
   SmileyGlanceOptions,
   SmileyGlanceAccent,
+  SmileyDissolveOptions,
 } from "~/types/smiley";
 
 /**
@@ -154,6 +155,28 @@ export function useSmiley() {
         accents,
       }).finally(endSmileyGesture);
     },
+
+    /** Set the dissolve amount directly (0 = intact, 1 = dispersed). */
+    setDissolve: (v: number): void => {
+      api()?.setDissolve(v);
+    },
+
+    /**
+     * Scrub-driven pixel transmogrification between two DOM anchors —
+     * call every scrub tick with the live progress.
+     */
+    morphScrub: (t: number, fromEl: HTMLElement, toEl: HTMLElement): void => {
+      api()?.morphScrub(t, fromEl, toEl);
+    },
+
+    /**
+     * Pixel comet: scatter into a pixel cloud, stream to the target
+     * element, recondense on arrival and keep tracking it.
+     */
+    dissolveTo: (
+      el: HTMLElement,
+      opts?: SmileyDissolveOptions,
+    ): Promise<void> => api()?.dissolveTo(el, opts) ?? Promise.resolve(),
 
     /** Access the Three.js camera for domRectToWorld calculations. */
     getCamera: () => api()?.getCamera() ?? null,

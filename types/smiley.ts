@@ -77,6 +77,15 @@ export interface SmileyGlanceOptions {
   tempo?: number;
 }
 
+export interface SmileyDissolveOptions {
+  /** Scatter-in-place duration (seconds, default: 0.35). */
+  outDuration?: number;
+  /** Comet-flight duration to the target (seconds, default: 0.65). */
+  travelDuration?: number;
+  /** Recondense duration after landing (seconds, default: 0.6). */
+  inDuration?: number;
+}
+
 /** Names of available shape-key expressions in the GLB. Extend as more are added. */
 export type SmileyExpression = "shocked" | "happy" | "wink";
 
@@ -152,6 +161,25 @@ export interface SmileyAPI {
    * working on top during the glance.
    */
   glance: (yawDeg?: number, opts?: SmileyGlanceOptions) => Promise<void>;
+
+  /** Set the dissolve amount directly (0 = intact, 1 = dispersed). */
+  setDissolve: (v: number) => void;
+
+  /**
+   * Pixel comet: scatter into a pixel cloud in place, stream across the
+   * screen to the target (cells stretch along the flight), recondense on
+   * arrival and keep tracking the element. Killable and chainable — a
+   * reversal mid-flight retweens from the current state.
+   */
+  dissolveTo: (el: HTMLElement, opts?: SmileyDissolveOptions) => Promise<void>;
+
+  /**
+   * Scrub-driven pixel transmogrification between two DOM anchors:
+   * t=0 intact at `fromEl` … t=1 intact at `toEl`; in between the ball's
+   * pixels physically detach, fly staggered arcs and reassemble.
+   * Call every scrub tick with the live progress.
+   */
+  morphScrub: (t: number, fromEl: HTMLElement, toEl: HTMLElement) => void;
 
   /** Access the Three.js camera for domRectToWorld calculations. */
   getCamera: () => any;

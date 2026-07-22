@@ -78,6 +78,7 @@ const prevRender = {
   sc: NaN,
   trail: NaN,
   tick: NaN,
+  dis: NaN,
 };
 let forceRender = true;
 
@@ -106,6 +107,95 @@ const scrubTarget = { x: 0, y: 0, scale: props.radius };
 // it moves mesh.position, so the velocity→trail pipeline reacts to scroll for free.
 let baseScale = props.radius;
 let scrollLag = 0;
+// ─── Pixel-morph particle system ─────────────────────────────────────────
+// True transmogrification for the scrubbed flight: ~900 instanced quads
+// ("pixels") each detach from the sphere at A, fly their own staggered,
+// wobbling arc, and land on the sphere at B — the ball erodes as its
+// pixels leave and reassembles as they arrive. Created lazily on first
+// morphScrub() call, updated only during scrub ticks.
+const MORPH_COUNT = 900;
+let morphMesh = null; // THREE.InstancedMesh
+let morphData = null; // per-particle random params
+const morphDummy = new THREE.Object3D();
+const morphTravel = new THREE.Vector2();
+
+const ensureMorphParticles = () => {
+  if (morphMesh || !scene) return;
+  const geo = new THREE.PlaneGeometry(1, 1);
+  // Same RAW shader family as the sphere, sharing the exact uColor value.
+  // A MeshBasicMaterial would pass through three's output color-space
+  // conversion while the sphere's raw ShaderMaterial does not — same hex,
+  // different pixels on screen. Raw + shared uniform = identical yellow.
+  const mat = new THREE.ShaderMaterial({
+    vertexShader: /* glsl */ `
+      void main() {
+        #ifdef USE_INSTANCING
+          gl_Position = projectionMatrix * modelViewMatrix * instanceMatrix * vec4(position, 1.0);
+        #else
+          gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+        #endif
+      }
+    `,
+    fragmentShader: /* glsl */ `
+      precision mediump float;
+      uniform vec3 uColor;
+      void main() { gl_FragColor = vec4(uColor, 1.0); }
+    `,
+    uniforms: { uColor: { value: new THREE.Color(guiParams.color) } },
+    transparent: true,
+    depthWrite: false,
+  });
+  morphMesh = new THREE.InstancedMesh(geo, mat, MORPH_COUNT);
+  morphMesh.visible = false;
+  morphMesh.renderOrder = 1; // above the (mostly dissolved) sphere
+  scene.add(morphMesh);
+
+  morphData = {
+    dirA: new Float32Array(MORPH_COUNT * 3), // unit departure point on sphere A
+    dirB: new Float32Array(MORPH_COUNT * 3), // unit arrival point on sphere B
+    stag: new Float32Array(MORPH_COUNT), // random component of launch order
+    size: new Float32Array(MORPH_COUNT), // quad size as fraction of radius
+    sag: new Float32Array(MORPH_COUNT), // per-particle arc depth factor
+    wobAmp: new Float32Array(MORPH_COUNT),
+    wobFreq: new Float32Array(MORPH_COUNT),
+    wobPhase: new Float32Array(MORPH_COUNT),
+  };
+  const randUnit = (arr, i) => {
+    // Uniform point on the sphere (z flattened toward the camera plane)
+    const u = Math.random() * 2 - 1;
+    const phi = Math.random() * Math.PI * 2;
+    const r = Math.sqrt(1 - u * u);
+    arr[i * 3] = r * Math.cos(phi);
+    arr[i * 3 + 1] = r * Math.sin(phi);
+    arr[i * 3 + 2] = u * 0.35;
+  };
+  for (let i = 0; i < MORPH_COUNT; i++) {
+    randUnit(morphData.dirA, i);
+    randUnit(morphData.dirB, i);
+    morphData.stag[i] = Math.random();
+    // Power-law sizes: lots of dust, a few chunky blocks — matches the
+    // sphere shader's cell range (its cells grow ×2.5 while dissolving)
+    morphData.size[i] = 0.028 + 0.075 * Math.pow(Math.random(), 2.2);
+    morphData.sag[i] = 0.5 + Math.random();
+    morphData.wobAmp[i] = 4 + Math.random() * 11;
+    morphData.wobFreq[i] = 1.5 + Math.random() * 2.2;
+    morphData.wobPhase[i] = Math.random() * Math.PI * 2;
+  }
+};
+
+// ─── Dissolve state ──────────────────────────────────────────────────────
+// v: 0 = intact … 1 = fully dispersed (invisible). Written by the
+// dissolveTo() timeline or setDissolve() — the timeline is killed before
+// any manual write, so there is always a single owner.
+const dissolveState = { v: 0 };
+let dissolveTl = null;
+
+// JS-side smoothstep for feature fade curves (matches GLSL smoothstep)
+const sstep = (a, b, x) => {
+  const k = Math.min(1, Math.max(0, (x - a) / (b - a)));
+  return k * k * (3 - 2 * k);
+};
+
 // Glance offsets (radians + squash factor) — written only by the glance()
 // GSAP timeline, read by animate() and ADDED RAW to the smoothed base
 // rotation. Raw (not lerped) so the tween's easing curve — overshoot,
@@ -138,6 +228,14 @@ const guiParams = {
   breathFreq: 0.25, // breaths per second (Hz)
   scrollLagMult: 1.2, // Lenis velocity (px/frame) → world-space drag
   scrollLagMax: 50, // clamp on the scroll drag offset
+  // ── Morph flight (scrubbed transmogrification)
+  morphArcSag: 55, // base sag of the particle flight arcs (world units)
+  morphWobble: 1, // multiplier on the serpentine wobble amplitude
+  morphDrift: 3.5, // slow along-travel drift amplitude (world units)
+  morphShimmer: 0.3, // per-particle size breathing in flight (0-1)
+  morphCrawl: 1.6, // wobble phase crawl speed (rad/s) — life while parked
+  morphExitTeaser: 0.25, // top-edge erosion as the ball exits the viewport
+  morphTrailBoost: 1.2, // directional-erosion boost at arrival/departure
   solidStart: 0.3,
   solidEnd: 3,
   trailBias: 1.5,
@@ -202,6 +300,7 @@ const fragmentShader = /* glsl */ `
   uniform float uSolidEnd;     // smoothstep upper bound for core
   uniform float uTrailBias;    // trailing edge dissolve multiplier
   uniform float uCoarseRatio;  // layer-2 cell size multiplier
+  uniform float uDissolve;     // 0 = intact … 1 = fully dispersed pixel cloud
 
   void main() {
     // Fresnel: 1 at center, 0 at silhouette
@@ -213,17 +312,24 @@ const fragmentShader = /* glsl */ `
     float trailDot = dot(normalize(vNormal.xy + vec2(0.001)), velSafe);
     float trailBias = (1.0 - trailDot) * 0.5; // 0 at leading, 1 at trailing
 
-    // Trailing edge dissolves much more than leading edge
-    float t = clamp(facing / (uEdgeWidth + uTrail * trailBias * uTrailBias), 0.0, 1.0);
+    // Trailing edge dissolves much more than leading edge.
+    // uDissolve widens the dissolution zone over the WHOLE sphere — the
+    // same silhouette-spray language, pushed inward until only sparse
+    // scattered cells remain (the smiley "becomes pixels").
+    float t = clamp(facing / (uEdgeWidth + uTrail * trailBias * uTrailBias + uDissolve * 2.5), 0.0, 1.0);
 
     // ── Anisotropic cells: elongated along movement direction ─────────────
     vec2 velPerp  = vec2(-velSafe.y, velSafe.x);
     float uvAlong = dot(vUv - 0.5, velSafe);
     float uvPerp  = dot(vUv - 0.5, velPerp);
 
-    // Cells stretch in movement direction proportionally to trail strength
-    float psAlong = uPixelSize * (1.0 + uTrail * uTrailStretch);
-    float psPerp  = uPixelSize;
+    // Cells stretch in movement direction proportionally to trail strength.
+    // While dissolving, the stretch is damped and cells grow instead —
+    // chunky square confetti drifting apart, not smeared streaks.
+    float stretch   = uTrail * uTrailStretch * (1.0 - 0.6 * uDissolve);
+    float cellScale = 1.0 + uDissolve * 1.5;
+    float psAlong = uPixelSize * (1.0 + stretch) * cellScale;
+    float psPerp  = uPixelSize * cellScale;
 
     float cx  = floor(uvAlong / psAlong);
     float cy  = floor(uvPerp  / psPerp);
@@ -237,9 +343,13 @@ const fragmentShader = /* glsl */ `
     float rnd = r1 * 0.65 + r2 * 0.35;
 
     float spray = step(1.0 - t, rnd);
-    float solid = smoothstep(uSolidStart, uSolidEnd, t);
+    // Smooth core dies early in the dissolve — only loose pixels remain
+    float solid = smoothstep(uSolidStart, uSolidEnd, t)
+                * (1.0 - smoothstep(0.2, 0.6, uDissolve));
+    // Terminal fade so a full dissolve can vanish entirely
+    float vanish = 1.0 - smoothstep(0.75, 1.0, uDissolve);
 
-    gl_FragColor = vec4(uColor, max(solid, spray));
+    gl_FragColor = vec4(uColor, max(solid, spray) * vanish);
   }
 `;
 
@@ -278,6 +388,10 @@ const animate = (now) => {
   const dt =
     lastFrameNow === 0 ? 1 : Math.min((now - lastFrameNow) / 16.667, 3);
   lastFrameNow = now;
+
+  // Morph transmogrification runs per-frame (not per scrub tick) so the
+  // swarm keeps living — wobble, drift, shimmer — while the scroll parks.
+  if (morphState.active) updateMorph(now / 1000);
 
   // ── Ambient life ─────────────────────────────────────────────────────
   // Slow Lissajous drift + layered sway + breath, computed from absolute
@@ -373,8 +487,10 @@ const animate = (now) => {
   }
 
   // Breath + glance squash applied on top of whatever scale the current mode
-  // wants — single writer for mesh.scale, all modes stay alive.
-  const s = baseScale * breathScale;
+  // wants — single writer for mesh.scale, all modes stay alive. Dissolving
+  // swells the ball ~35%: the sparse pixels loosen outward as a cloud, then
+  // condense back to size.
+  const s = baseScale * breathScale * (1 + dissolveState.v * 0.18);
   const sq = glanceState.squash;
   mesh.scale.set(s * (1 - sq), s * (1 + sq), s);
 
@@ -384,7 +500,10 @@ const animate = (now) => {
   const speed = Math.sqrt(vx * vx + vy * vy);
   moveSpeed += (speed - moveSpeed) * 0.12;
 
-  if (speed > 0.001) {
+  // During a morph, velocityDir is hijacked by updateMorph() to aim the
+  // shader's directional spray along the travel axis — the mesh chasing
+  // its scrolling anchor must not overwrite that story.
+  if (speed > 0.001 && !morphState.active) {
     const inv = 1.0 / speed;
     velocityDir.x += (vx * inv - velocityDir.x) * 0.15;
     velocityDir.y += (vy * inv - velocityDir.y) * 0.15;
@@ -412,7 +531,14 @@ const animate = (now) => {
     u.uSolidEnd.value = guiParams.solidEnd;
     u.uTrailBias.value = guiParams.trailBias;
     u.uCoarseRatio.value = guiParams.coarseRatio;
+    u.uDissolve.value = dissolveState.v;
   }
+
+  // Face features can't dissolve through the pixel shader (MeshBasic) —
+  // they fade out EARLY in the dissolve (the ball loses its face first,
+  // then scatters) and back in as it recondenses.
+  const featureAlpha = 1 - sstep(0.12, 0.45, dissolveState.v);
+  for (const m of featureMeshes) m.material.opacity = featureAlpha;
 
   // trailStrength: rises fast with velocity, decays slowly after stop
   // → trail lingers organically instead of cutting instantly
@@ -432,7 +558,8 @@ const animate = (now) => {
         Math.sin((now / 1000) * 2 * Math.PI * guiParams.idleBreathFreq);
 
   for (const m of meshes)
-    m.material.uniforms.uTrail.value = trailStrength + idleBreath;
+    m.material.uniforms.uTrail.value =
+      trailStrength + idleBreath + dissolveState.v * 0.15 + scrubTrail;
 
   // Tick: rapid scroll during motion, slow drift at rest.
   // Float (no Math.floor) so the noise pattern shifts continuously, multiplied
@@ -440,7 +567,9 @@ const animate = (now) => {
   tickCounter +=
     (smoothVelo > 0.004
       ? smoothVelo * guiParams.flickerSpeed
-      : guiParams.idleShimmer) * dt;
+      : guiParams.idleShimmer) *
+      dt +
+    dissolveState.v * 0.25 * dt; // dissolving pixels flicker, gently
   for (const m of meshes) m.material.uniforms.uTick.value = tickCounter;
 
   // Subtle tilt toward mouse. If the tracked element pins a yaw or pitch
@@ -516,7 +645,8 @@ const animate = (now) => {
     Math.abs(mesh.rotation.z - prevRender.rz) > 0.0005 ||
     Math.abs(mesh.scale.x - prevRender.sc) > 0.05 ||
     Math.abs(trailStrength + idleBreath - prevRender.trail) > 0.001 ||
-    Math.abs(tickCounter - prevRender.tick) > 1e-9;
+    Math.abs(tickCounter - prevRender.tick) > 1e-9 ||
+    Math.abs(dissolveState.v - prevRender.dis) > 0.001;
 
   if (dirty) {
     perfMonitor.markStart("three");
@@ -531,6 +661,7 @@ const animate = (now) => {
     prevRender.sc = mesh.scale.x;
     prevRender.trail = trailStrength + idleBreath;
     prevRender.tick = tickCounter;
+    prevRender.dis = dissolveState.v;
     forceRender = false;
   }
 
@@ -586,6 +717,7 @@ const init = () => {
         uSolidEnd: { value: guiParams.solidEnd },
         uTrailBias: { value: guiParams.trailBias },
         uCoarseRatio: { value: guiParams.coarseRatio },
+        uDissolve: { value: 0 },
       },
       transparent: true,
       depthWrite: false,
@@ -605,10 +737,12 @@ const init = () => {
     gltf.scene.traverse((child) => {
       if (!child.isMesh) return;
       if (isFeature(child.name)) {
-        // Features → solid fill, no pixel effect
+        // Features → solid fill, no pixel effect. Transparent so the
+        // dissolve can fade the face out (opacity driven per-frame).
         child.material = new THREE.MeshBasicMaterial({
           color: new THREE.Color(guiParams.featureColor),
-          transparent: false,
+          transparent: true,
+          opacity: 1,
           depthWrite: true,
         });
         featureMeshes.push(child);
@@ -681,6 +815,35 @@ const init = () => {
         .add(guiParams, "trackingScale", 0.1, 2.0, 0.01)
         .name("Tracking size");
       fAppear.add(guiParams, "hoverOffset", 0, 80, 0.5).name("Hover offset");
+      fAppear
+        .add({ dissolve: 0 }, "dissolve", 0, 1, 0.01)
+        .name("Dissolve (test)")
+        .onChange((v) => setDissolve(v));
+
+      // ── Morph flight — pixel-perfect tuning of the transmogrification.
+      // "Scrub (test)" drives the morph by hand, frame by frame, using the
+      // hero face and the About placeholder as anchors.
+      const fMorph = gui.addFolder("✦ Morph flight");
+      fMorph.add(guiParams, "morphArcSag", 0, 160, 1).name("Arc sag");
+      fMorph.add(guiParams, "morphWobble", 0, 3, 0.05).name("Wobble");
+      fMorph.add(guiParams, "morphDrift", 0, 12, 0.1).name("Drift");
+      fMorph.add(guiParams, "morphShimmer", 0, 0.8, 0.01).name("Shimmer");
+      fMorph.add(guiParams, "morphCrawl", 0, 5, 0.05).name("Crawl speed");
+      fMorph
+        .add(guiParams, "morphExitTeaser", 0, 1, 0.01)
+        .name("Exit teaser");
+      fMorph
+        .add(guiParams, "morphTrailBoost", 0, 3, 0.05)
+        .name("Trail boost");
+      fMorph
+        .add({ scrub: 0 }, "scrub", 0, 1, 0.001)
+        .name("Scrub (test)")
+        .onChange((v) => {
+          const a = document.querySelector("[hiye-face]");
+          const b = document.querySelector("[hiye-face-placeholder]");
+          if (a && b) morphScrub(v, a, b);
+        });
+      fMorph.open(false);
 
       // ── Trail & shimmer ────────────────────────────────────────────────
       const fTrail = gui.addFolder("↝ Trail & shimmer");
@@ -1054,6 +1217,270 @@ const wink = (opts = {}) => {
   });
 };
 
+/**
+ * Set the dissolve amount directly (0 = intact, 1 = dispersed/invisible).
+ * Kills any dissolveTo() in flight — single owner of dissolveState.
+ */
+const setDissolve = (v) => {
+  dissolveTl?.kill();
+  dissolveState.v = Math.min(1, Math.max(0, v));
+  scrubTrail = 0;
+  forceRender = true;
+};
+
+/**
+ * Pixel comet: the smiley scatters into a loose pixel cloud where it
+ * stands (face fades first), then the cloud STREAMS across the screen to
+ * the target — the velocity→trail pipeline stretches the sparse cells
+ * along the flight for free — and recondenses on arrival, tracking the
+ * element. Killable/chainable — a reversal mid-flight retweens from the
+ * current state, no snap. Fire-and-forget.
+ *
+ *   smiley.dissolveTo(placeholderEl)
+ *   smiley.dissolveTo(heroEl, { travelDuration: 0.9 })
+ */
+const dissolveTo = (el, opts = {}) => {
+  const {
+    outDuration = 0.35,
+    travelDuration = 0.65,
+    inDuration = 0.6,
+  } = opts;
+
+  dissolveTl?.kill();
+  return new Promise((resolve) => {
+    const from = { x: 0, y: 0, s: props.radius };
+    const travel = { t: 0 };
+    dissolveTl = gsap.timeline({
+      onComplete: resolve,
+      onInterrupt: resolve,
+      onUpdate: () => {
+        forceRender = true;
+      },
+    });
+    dissolveTl
+      // 1 — scatter in place: the face dies, the ball loosens into cells
+      .to(dissolveState, {
+        v: 0.85,
+        duration: outDuration,
+        ease: "power2.in",
+      })
+      // 2 — comet flight: capture the departure point, then stream the
+      // dissolved cloud to the target. The target rect is read LIVE each
+      // tick (it scrolls during the flight); the position delta feeds the
+      // velocity pipeline → cells stretch along the flight path.
+      .call(() => {
+        from.x = mesh.position.x;
+        from.y = mesh.position.y;
+        from.s = baseScale;
+      })
+      .to(travel, {
+        t: 1,
+        duration: travelDuration,
+        ease: "power2.inOut",
+        onUpdate: () => {
+          if (!renderer || !camera) return;
+          const cw = renderer.domElement.clientWidth || window.innerWidth;
+          const ch = renderer.domElement.clientHeight || window.innerHeight;
+          const { x, y, worldSize } = domRectToWorld(
+            el.getBoundingClientRect(),
+            camera,
+            cw,
+            ch,
+          );
+          const localMul = parseFloat(el.dataset.smileyScale) || 1;
+          const ts = (worldSize / 2) * guiParams.trackingScale * localMul;
+          const k = travel.t;
+          setScrubPosition(
+            from.x + (x - from.x) * k,
+            from.y + (y - from.y) * k,
+            from.s + (ts - from.s) * k,
+          );
+        },
+      })
+      // 3 — land: hand off to live tracking, pixels catch up into place
+      .call(() => {
+        startTracking(el);
+      })
+      .to(dissolveState, { v: 0, duration: inDuration, ease: "power3.out" });
+  });
+};
+
+// Live morph state — morphScrub() only records the scrub progress; ALL
+// motion is computed in animate() every frame, so the swarm keeps living
+// (time-driven wobble, drift, shimmer) even when the scroll is parked
+// mid-flight — matching the sphere shader's ever-flickering cells.
+const morphState = { active: false, t: 0, tStart: 0, fromEl: null, toEl: null };
+let scrubTrail = 0; // directional-erosion boost on uTrail during the morph
+
+/**
+ * Scrub-driven pixel transmogrification between two DOM anchors.
+ * t=0 → intact ball tracking `fromEl`; t=1 → intact ball tracking `toEl`.
+ * Call every scrub tick with the live progress — rendering runs per-frame.
+ */
+const morphScrub = (t, fromEl, toEl) => {
+  morphState.t = t;
+  morphState.fromEl = fromEl;
+  morphState.toEl = toEl;
+  morphState.active = t > 0.001 && t < 0.999 && !!fromEl && !!toEl;
+  if (!morphState.active) {
+    // Reset the internal clock ONLY when leaving through the START.
+    // Leaving through the END must keep tStart: scrolling back re-enters
+    // with the same clock, so the return plays the exact mirror of the
+    // forward journey — the B→A position swap stays off-screen. Wiping it
+    // here was the "teleport on the way back" bug.
+    if (t < 0.5) morphState.tStart = 0;
+    scrubTrail = 0;
+    if (morphMesh) morphMesh.visible = false;
+  }
+  forceRender = true;
+};
+
+// Per-frame morph update — called from animate() while morphState.active.
+// Path position is a pure function of scrub t (reversible, parkable);
+// wobble/drift/shimmer are functions of TIME so the swarm never freezes.
+const updateMorph = (timeSec) => {
+  if (!renderer || !camera || !mesh) return;
+  ensureMorphParticles();
+
+  const t = morphState.t;
+  const cw = renderer.domElement.clientWidth || window.innerWidth;
+  const ch = renderer.domElement.clientHeight || window.innerHeight;
+  const A = domRectToWorld(
+    morphState.fromEl.getBoundingClientRect(),
+    camera,
+    cw,
+    ch,
+  );
+  const B = domRectToWorld(
+    morphState.toEl.getBoundingClientRect(),
+    camera,
+    cw,
+    ch,
+  );
+  const mulA = parseFloat(morphState.fromEl.dataset.smileyScale) || 1;
+  const mulB = parseFloat(morphState.toEl.dataset.smileyScale) || 1;
+  const rA = (A.worldSize / 2) * guiParams.trackingScale * mulA;
+  const rB = (B.worldSize / 2) * guiParams.trackingScale * mulB;
+
+  morphTravel.set(B.x - A.x, B.y - A.y);
+  const dist = morphTravel.length() || 1;
+  morphTravel.divideScalar(dist);
+  const perpX = -morphTravel.y;
+  const perpY = morphTravel.x;
+
+  // ── The magician's clock ───────────────────────────────────────────
+  // Never show both languages at once: while the ball at A is on screen
+  // it stays INTACT and simply scrolls out with the page. The particle
+  // stream only begins once the ball has left the viewport (e→1) — it
+  // pours in from above the fold, and the viewer infers the dissolve
+  // happened off-screen. tm is the morph's internal clock, remapped to
+  // the scroll remaining after the exit; the gate eases it continuously
+  // so reverse-scrub re-entry never pops.
+  const vh2 = viewportWorldH / 2;
+  const e = sstep(vh2 - rA, vh2 + rA * 0.8, A.y); // 0 visible … 1 fully out
+  if (e < 0.995) morphState.tStart = t;
+  const gate = sstep(0.75, 0.98, e);
+  const tm =
+    Math.min(
+      1,
+      Math.max(
+        0,
+        (t - morphState.tStart) / Math.max(0.05, 1 - morphState.tStart),
+      ),
+    ) * gate;
+
+  // The ball never travels: intact at A until off-screen (a whisper of
+  // top-edge erosion as it exits foreshadows the trick), then reassembles
+  // at B as the pixels land. velocityDir re-aims the shader's directional
+  // spray along the travel axis so the arrival builds like a comet.
+  const atA = tm < 0.35;
+  setScrubPosition(atA ? A.x : B.x, atA ? A.y : B.y, atA ? rA : rB);
+  velocityDir.x = atA ? -morphTravel.x : morphTravel.x;
+  velocityDir.y = atA ? -morphTravel.y : morphTravel.y;
+  dissolveTl?.kill();
+  dissolveState.v = atA
+    ? guiParams.morphExitTeaser * e
+    : 1 - sstep(0.35, 0.95, tm);
+  scrubTrail =
+    guiParams.morphTrailBoost * dissolveState.v * (1 - dissolveState.v);
+
+  // ── Particle swarm (runs on the remapped clock) ────────────────────
+  const show = tm > 0.01 && tm < 0.985;
+  morphMesh.visible = show;
+  if (show && morphData) {
+    const d = morphData;
+    for (let i = 0; i < MORPH_COUNT; i++) {
+      const i3 = i * 3;
+      const dax = d.dirA[i3];
+      const day = d.dirA[i3 + 1];
+      // One law of matter, time-symmetric: pixels leave from the face
+      // NEAREST the destination first (kA→0 = facing B), and seat on the
+      // face FARTHEST from the source first (kB→0) — so the reforming
+      // ball's open seam always faces the incoming stream.
+      const kA =
+        0.5 - 0.5 * (dax * morphTravel.x + day * morphTravel.y);
+      const kB =
+        0.5 -
+        0.5 * (d.dirB[i3] * morphTravel.x + d.dirB[i3 + 1] * morphTravel.y);
+      const t0 = 0.02 + 0.1 * d.stag[i] + 0.22 * kA; // launch ∈ [0.02, 0.34]
+      const t1 = 0.45 + 0.12 * d.stag[i] + 0.28 * kB; // dock ∈ [0.45, 0.85]
+      const p = sstep(t0, Math.max(t0 + 0.25, t1), tm);
+
+      // Departure / arrival points live on the two sphere surfaces
+      const ax = A.x + dax * rA;
+      const ay = A.y + day * rA;
+      const bx = B.x + d.dirB[i3] * rB;
+      const by = B.y + d.dirB[i3 + 1] * rB;
+      // Flight-shaped motion: individual sagging arc + serpentine wobble
+      // whose phase CRAWLS with time (the parked swarm keeps undulating),
+      // + a slow along-travel drift — all zero at the endpoints.
+      const flight = Math.sin(p * Math.PI);
+      const sag = flight * guiParams.morphArcSag * d.sag[i];
+      const wob =
+        Math.sin(
+          p * d.wobFreq[i] * Math.PI * 2 +
+            d.wobPhase[i] +
+            timeSec * guiParams.morphCrawl,
+        ) *
+        d.wobAmp[i] *
+        guiParams.morphWobble *
+        flight;
+      const drift =
+        Math.sin(timeSec * 1.1 + d.wobPhase[i] * 3.0) *
+        guiParams.morphDrift *
+        flight;
+
+      morphDummy.position.set(
+        ax +
+          (bx - ax) * p +
+          perpX * wob +
+          morphTravel.x * drift,
+        ay +
+          (by - ay) * p +
+          perpY * wob +
+          morphTravel.y * drift -
+          sag,
+        (d.dirA[i3 + 2] + (d.dirB[i3 + 2] - d.dirA[i3 + 2]) * p) * rA,
+      );
+      // Airborne envelope + shader-style shimmer: each pixel breathes
+      // in size like the sphere's hash-flickering cells, only in flight.
+      const env = sstep(0, 0.06, p) * (1 - sstep(0.92, 1, p));
+      const shimmer =
+        1 -
+        guiParams.morphShimmer *
+          flight *
+          (0.5 + 0.5 * Math.sin(timeSec * 2.5 + d.wobPhase[i] * 9.0));
+      morphDummy.scale.setScalar(
+        Math.max(1e-4, env * shimmer * d.size[i] * (rA + (rB - rA) * p)),
+      );
+      morphDummy.updateMatrix();
+      morphMesh.setMatrixAt(i, morphDummy.matrix);
+    }
+    morphMesh.instanceMatrix.needsUpdate = true;
+  }
+  forceRender = true;
+};
+
 // Single owner of glanceState — a new gesture kills the previous timeline
 // and tweens from current values (continuous, no snap).
 let glanceTl = null;
@@ -1284,6 +1711,9 @@ defineExpose({
   setExpression,
   wink,
   glance,
+  setDissolve,
+  dissolveTo,
+  morphScrub,
   getCamera: () => camera,
   getRenderer: () => renderer,
 });
@@ -1297,6 +1727,7 @@ onBeforeUnmount(() => {
   useRAFManager().unregister(rafId);
   stopTracking();
   glanceTl?.kill();
+  dissolveTl?.kill();
   gui?.destroy();
   window.removeEventListener("resize", debouncedResize);
   window.removeEventListener("pointermove", onPointerMove);
@@ -1309,6 +1740,8 @@ onBeforeUnmount(() => {
     m.geometry?.dispose();
     m.material?.dispose();
   }
+  morphMesh?.geometry?.dispose();
+  morphMesh?.material?.dispose();
   renderer?.dispose();
   renderer?.domElement?.parentNode?.removeChild(renderer.domElement);
 });

@@ -57,7 +57,6 @@
 
 <script setup>
 import RightArrow from "../icons/RightArrow.vue";
-import { domRectToWorld } from "~/utils/domToWorld";
 
 const { gsap, SplitText, mm, BP, scheduleRefresh } = useGSAP();
 
@@ -76,11 +75,11 @@ const setupAnimations = () => {
     const placeholder = document.querySelector("[hiye-face-placeholder]");
     if (!hiyeFace || !placeholder || !sectionRef.value) return;
 
-    const cam = pixelBlob?.value?.getCamera();
-    const ren = pixelBlob?.value?.getRenderer();
-    if (cam && ren) {
-      const trackingScale = 0.48;
-
+    // Scrubbed pixel transmogrification: the scroll drives the journey.
+    // The ball erodes at the hero as its pixels physically detach, they
+    // stream across in staggered individual arcs, and the ball reassembles
+    // pixel by pixel inline in the sentence. morphScrub() owns everything.
+    if (pixelBlob?.value) {
       gsap.timeline({
         scrollTrigger: {
           trigger: sectionRef.value,
@@ -89,36 +88,18 @@ const setupAnimations = () => {
           scrub: 1,
           invalidateOnRefresh: true,
           onUpdate: (self) => {
-            // Read live DOM positions every tick — never stale
-            const cw = ren.domElement.clientWidth || window.innerWidth;
-            const ch = ren.domElement.clientHeight || window.innerHeight;
-            const a = domRectToWorld(
-              hiyeFace.getBoundingClientRect(),
-              cam,
-              cw,
-              ch,
-            );
-            const b = domRectToWorld(
-              placeholder.getBoundingClientRect(),
-              cam,
-              cw,
-              ch,
-            );
-            const sA = (a.worldSize / 2) * trackingScale;
-            const sB = (b.worldSize / 2) * trackingScale;
-            const t = self.progress;
-            pixelBlob?.value?.setScrubPosition(
-              a.x + (b.x - a.x) * t,
-              a.y + (b.y - a.y) * t,
-              sA + (sB - sA) * t,
+            pixelBlob?.value?.morphScrub(
+              self.progress,
+              hiyeFace,
+              placeholder,
             );
           },
           onLeave: () => {
-            // Scrub done — track placeholder so smiley follows it on scroll
+            pixelBlob?.value?.setDissolve(0);
             pixelBlob?.value?.startTracking(placeholder);
           },
           onLeaveBack: () => {
-            // Back to hero — track hiye-face again
+            pixelBlob?.value?.setDissolve(0);
             const hf = document.querySelector("[hiye-face]");
             if (hf) pixelBlob?.value?.startTracking(hf);
           },
@@ -214,11 +195,8 @@ const setupAnimations = () => {
     const placeholder = document.querySelector("[hiye-face-placeholder]");
     if (!hiyeFace || !placeholder || !sectionRef.value) return;
 
-    const cam = pixelBlob?.value?.getCamera();
-    const ren = pixelBlob?.value?.getRenderer();
-    if (cam && ren) {
-      const trackingScale = 0.48;
-
+    // Scrubbed pixel transmogrification — same as desktop.
+    if (pixelBlob?.value) {
       gsap.timeline({
         scrollTrigger: {
           trigger: sectionRef.value,
@@ -227,33 +205,18 @@ const setupAnimations = () => {
           scrub: 1,
           invalidateOnRefresh: true,
           onUpdate: (self) => {
-            const cw = ren.domElement.clientWidth || window.innerWidth;
-            const ch = ren.domElement.clientHeight || window.innerHeight;
-            const a = domRectToWorld(
-              hiyeFace.getBoundingClientRect(),
-              cam,
-              cw,
-              ch,
-            );
-            const b = domRectToWorld(
-              placeholder.getBoundingClientRect(),
-              cam,
-              cw,
-              ch,
-            );
-            const sA = (a.worldSize / 2) * trackingScale;
-            const sB = (b.worldSize / 2) * trackingScale;
-            const t = self.progress;
-            pixelBlob?.value?.setScrubPosition(
-              a.x + (b.x - a.x) * t,
-              a.y + (b.y - a.y) * t,
-              sA + (sB - sA) * t,
+            pixelBlob?.value?.morphScrub(
+              self.progress,
+              hiyeFace,
+              placeholder,
             );
           },
           onLeave: () => {
+            pixelBlob?.value?.setDissolve(0);
             pixelBlob?.value?.startTracking(placeholder);
           },
           onLeaveBack: () => {
+            pixelBlob?.value?.setDissolve(0);
             const hf = document.querySelector("[hiye-face]");
             if (hf) pixelBlob?.value?.startTracking(hf);
           },
