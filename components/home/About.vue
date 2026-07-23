@@ -85,7 +85,7 @@ const setupAnimations = () => {
           trigger: sectionRef.value,
           start: "top bottom",
           end: "top top",
-          scrub: 1,
+          scrub: 0.7,
           invalidateOnRefresh: true,
           onUpdate: (self) => {
             pixelBlob?.value?.morphScrub(
@@ -202,7 +202,7 @@ const setupAnimations = () => {
           trigger: sectionRef.value,
           start: "top bottom",
           end: "top top",
-          scrub: 1,
+          scrub: 0.7,
           invalidateOnRefresh: true,
           onUpdate: (self) => {
             pixelBlob?.value?.morphScrub(

@@ -221,6 +221,9 @@ const guiParams = {
   // Smooth because uTrail affects cell stretch geometrically (continuous shader response).
   idleBreathAmp: 0.05, // amplitude of the breath on uTrail (0 = off)
   idleBreathFreq: 0.4, // breaths per second (Hz)
+  // ── Pixel cells
+  screenSpaceCells: true, // true = screen-aligned squares (same matter as morph/grid)
+  cellRatio: 0.05, // screen cell size as fraction of the ball's screen radius
   // ── Ambient life (always-on, all modes)
   idleFloatAmp: 7, // world-units Lissajous drift amplitude
   idleSwayDeg: 2, // slow rotation sway amplitude (degrees)
@@ -232,10 +235,10 @@ const guiParams = {
   morphArcSag: 55, // base sag of the particle flight arcs (world units)
   morphWobble: 1, // multiplier on the serpentine wobble amplitude
   morphDrift: 3.5, // slow along-travel drift amplitude (world units)
-  morphShimmer: 0.3, // per-particle size breathing in flight (0-1)
-  morphCrawl: 1.6, // wobble phase crawl speed (rad/s) — life while parked
+  morphShimmer: 0.15, // per-particle size breathing in flight (0-1)
+  morphCrawl: 1.1, // wobble phase crawl speed (rad/s) — life while parked
   morphExitTeaser: 0.25, // top-edge erosion as the ball exits the viewport
-  morphTrailBoost: 1.2, // directional-erosion boost at arrival/departure
+  morphTrailBoost: 0.7, // directional-erosion boost at arrival/departure
   solidStart: 0.3,
   solidEnd: 3,
   trailBias: 1.5,
@@ -301,6 +304,9 @@ const fragmentShader = /* glsl */ `
   uniform float uTrailBias;    // trailing edge dissolve multiplier
   uniform float uCoarseRatio;  // layer-2 cell size multiplier
   uniform float uDissolve;     // 0 = intact … 1 = fully dispersed pixel cloud
+  uniform float uScreenSpace;  // 1 = axis-aligned screen-space square cells
+  uniform float uScreenCell;   // screen-space cell size (physical px)
+  uniform vec2  uBallScreen;   // ball center in physical px — grid anchor
 
   void main() {
     // Fresnel: 1 at center, 0 at silhouette
@@ -318,25 +324,43 @@ const fragmentShader = /* glsl */ `
     // scattered cells remain (the smiley "becomes pixels").
     float t = clamp(facing / (uEdgeWidth + uTrail * trailBias * uTrailBias + uDissolve * 2.5), 0.0, 1.0);
 
-    // ── Anisotropic cells: elongated along movement direction ─────────────
-    vec2 velPerp  = vec2(-velSafe.y, velSafe.x);
-    float uvAlong = dot(vUv - 0.5, velSafe);
-    float uvPerp  = dot(vUv - 0.5, velPerp);
-
     // Cells stretch in movement direction proportionally to trail strength.
-    // While dissolving, the stretch is damped and cells grow instead —
-    // chunky square confetti drifting apart, not smeared streaks.
-    float stretch   = uTrail * uTrailStretch * (1.0 - 0.6 * uDissolve);
-    float cellScale = 1.0 + uDissolve * 1.5;
-    float psAlong = uPixelSize * (1.0 + stretch) * cellScale;
-    float psPerp  = uPixelSize * cellScale;
+    // While dissolving, the stretch is damped HARD (85%) so cells stay
+    // near-square like the morph particles — the erosion's direction reads
+    // through the spray asymmetry, not through smearing — and they grow
+    // moderately into chunky confetti.
+    float stretch   = uTrail * uTrailStretch * (1.0 - 0.85 * uDissolve);
+    float cellScale = 1.0 + uDissolve * 1.0;
 
-    float cx  = floor(uvAlong / psAlong);
-    float cy  = floor(uvPerp  / psPerp);
-
-    // Second coarser layer offset to break regularity
-    float cx2 = floor((uvAlong + psAlong * 0.7) / (psAlong * uCoarseRatio));
-    float cy2 = floor((uvPerp  + psPerp  * 0.4) / (psPerp  * uCoarseRatio));
+    float cx; float cy; float cx2; float cy2;
+    if (uScreenSpace > 0.5) {
+      // ── Screen-space cells: TRUE squares, axis-aligned — the exact same
+      // matter as the morph particles and the transition grid. The grid is
+      // ANCHORED to the ball's center (not the screen): it translates
+      // rigidly with the ball, so the ambient drift never re-rasterizes
+      // the edge (no boiling) — only the deliberate hash flicker animates.
+      // Stretch elongates cells along the dominant movement axis only, so
+      // they stay axis-aligned rectangles.
+      float sx = uScreenCell * (1.0 + stretch * abs(velSafe.x)) * cellScale;
+      float sy = uScreenCell * (1.0 + stretch * abs(velSafe.y)) * cellScale;
+      vec2 sc = gl_FragCoord.xy - uBallScreen;
+      cx  = floor(sc.x / sx);
+      cy  = floor(sc.y / sy);
+      cx2 = floor((sc.x + sx * 0.7) / (sx * uCoarseRatio));
+      cy2 = floor((sc.y + sy * 0.4) / (sy * uCoarseRatio));
+    } else {
+      // ── Surface-space cells (legacy look): painted on the sphere's UV,
+      // curved and foreshortened by the 3D projection.
+      vec2 velPerp  = vec2(-velSafe.y, velSafe.x);
+      float uvAlong = dot(vUv - 0.5, velSafe);
+      float uvPerp  = dot(vUv - 0.5, velPerp);
+      float psAlong = uPixelSize * (1.0 + stretch) * cellScale;
+      float psPerp  = uPixelSize * cellScale;
+      cx  = floor(uvAlong / psAlong);
+      cy  = floor(uvPerp  / psPerp);
+      cx2 = floor((uvAlong + psAlong * 0.7) / (psAlong * uCoarseRatio));
+      cy2 = floor((uvPerp  + psPerp  * 0.4) / (psPerp  * uCoarseRatio));
+    }
 
     float r1  = fract(sin(cx  * 127.1 + cy  * 311.7 + uTick * 57.3) * 43758.5);
     float r2  = fract(sin(cx2 * 269.5 + cy2 * 183.3 + uTick * 31.7) * 23421.6);
@@ -519,6 +543,21 @@ const animate = (now) => {
   const clamped = Math.min(moveSpeed * 0.025, 0.12);
   smoothVelo += (clamped - smoothVelo) * 0.08;
 
+  // Screen-space cell size scales with the ball's on-screen radius so the
+  // pixel density stays consistent from hero size down to inline size.
+  // The grid anchor follows the ball's projected center (physical px) so
+  // ambient drift moves the grid WITH the ball instead of through it.
+  const canvasH = renderer.domElement.clientHeight || window.innerHeight;
+  const canvasW = renderer.domElement.clientWidth || window.innerWidth;
+  const pr = renderer.getPixelRatio();
+  const screenCellPx =
+    Math.max(3, (mesh.scale.y / viewportWorldH) * canvasH * guiParams.cellRatio) *
+    pr;
+  const ballScreenX =
+    (mesh.position.x / (viewportWorldH * camera.aspect) + 0.5) * canvasW * pr;
+  const ballScreenY =
+    (mesh.position.y / viewportWorldH + 0.5) * canvasH * pr;
+
   // Update shader uniforms on all sub-meshes (direct assignment, no intermediate object)
   for (const m of meshes) {
     const u = m.material.uniforms;
@@ -532,6 +571,9 @@ const animate = (now) => {
     u.uTrailBias.value = guiParams.trailBias;
     u.uCoarseRatio.value = guiParams.coarseRatio;
     u.uDissolve.value = dissolveState.v;
+    u.uScreenSpace.value = guiParams.screenSpaceCells ? 1 : 0;
+    u.uScreenCell.value = screenCellPx;
+    u.uBallScreen.value.set(ballScreenX, ballScreenY);
   }
 
   // Face features can't dissolve through the pixel shader (MeshBasic) —
@@ -718,6 +760,9 @@ const init = () => {
         uTrailBias: { value: guiParams.trailBias },
         uCoarseRatio: { value: guiParams.coarseRatio },
         uDissolve: { value: 0 },
+        uScreenSpace: { value: 1 },
+        uScreenCell: { value: 12 },
+        uBallScreen: { value: new THREE.Vector2(0, 0) },
       },
       transparent: true,
       depthWrite: false,
@@ -819,6 +864,12 @@ const init = () => {
         .add({ dissolve: 0 }, "dissolve", 0, 1, 0.01)
         .name("Dissolve (test)")
         .onChange((v) => setDissolve(v));
+      fAppear
+        .add(guiParams, "screenSpaceCells")
+        .name("Screen-space px");
+      fAppear
+        .add(guiParams, "cellRatio", 0.02, 0.12, 0.002)
+        .name("Cell size ratio");
 
       // ── Morph flight — pixel-perfect tuning of the transmogrification.
       // "Scrub (test)" drives the morph by hand, frame by frame, using the
@@ -1035,6 +1086,8 @@ const init = () => {
         .onChange((v) => {
           for (const m of meshes)
             if (!isFeature(m.name)) m.material.uniforms.uColor.value.set(v);
+          // Morph particles share the same yellow — keep them in sync
+          morphMesh?.material.uniforms.uColor.value.set(v);
         });
       gui
         .addColor(guiParams, "featureColor")
@@ -1042,6 +1095,77 @@ const init = () => {
         .onChange((v) => {
           for (const m of featureMeshes) m.material.color.set(v);
         });
+
+      // ── Tooltips ───────────────────────────────────────────────────────
+      // Native browser tooltips (title attr) keyed by display name — shown
+      // on hover over any slider label.
+      const TIPS = {
+        // ◈ Appearance
+        "Pixel size": "Taille des cellules en mode surface (UV) — sans effet si Screen-space px est ON",
+        "Edge width": "Épaisseur de la zone de dissolution au bord (fresnel). Plus large = bord plus rongé",
+        "Solid start": "Début du cœur plein. Plus haut = cœur plus petit, plus de spray",
+        "Solid end": "Fin du dégradé du cœur. Plus bas = cœur plus dur/net",
+        "Coarse layer": "Taille de la 2e couche de grosses cellules qui casse la régularité du damier",
+        "Tracking size": "Échelle du smiley quand il est ancré à un élément DOM",
+        "Hover offset": "Amplitude du décalage organique vers le curseur en mode tracking",
+        "Dissolve (test)": "Pilote la désagrégation à la main (0 = intact, 1 = dispersé) — pour figer un stade",
+        "Screen-space px": "ON : cellules carrées alignées écran (même matière que particules/grille). OFF : cellules collées sur la sphère, courbées par la 3D",
+        "Cell size ratio": "Taille des cellules écran en fraction du rayon apparent — densité constante à toutes les tailles",
+        // ✦ Morph flight
+        "Arc sag": "Affaissement des trajectoires de vol (la gravité du flux, en unités monde)",
+        "Wobble": "Amplitude de la serpentine des particules en vol",
+        "Drift": "Dérive lente le long de l'axe de vol (vie du nuage)",
+        "Shimmer": "Respiration de taille des particules en vol (trop haut = clignotement)",
+        "Crawl speed": "Vitesse de vie du nuage quand le scroll est parké (rampement de phase)",
+        "Exit teaser": "Érosion du bord haut quand la boule sort du viewport (l'avant-goût du tour)",
+        "Trail boost": "Intensité de l'érosion directionnelle de la boule pendant le morph (les barres)",
+        "Scrub (test)": "Pilote le vol complet à la main, image par image — le banc de réglage au pixel",
+        // ↝ Trail & shimmer
+        "Stretch": "Étirement des cellules dans le sens du déplacement (traînée)",
+        "Edge bias": "Asymétrie avant/arrière de la dissolution — l'effet comète",
+        "Flicker (motion)": "Vitesse de clignotement des cellules quand la boule bouge",
+        "Idle breath amp": "Respiration du bord dissous au repos (0 = off)",
+        "Idle breath Hz": "Fréquence de cette respiration (souffles/seconde)",
+        "Idle shimmer (noise)": "Bruit de fond des cellules à l'arrêt total",
+        "Velo → trail": "Sensibilité : combien la vitesse nourrit la traînée",
+        "Rise speed": "Attaque de la traînée (montée)",
+        "Decay speed": "Retombée de la traînée après l'arrêt",
+        // ☻ Expressions
+        "Shocked level": "Blend direct de la shape key choquée (0-1)",
+        "Happy level": "Blend direct du sourire élargi (0-1)",
+        "Wink level": "Blend direct du clin d'œil (0-1)",
+        "→ Shock! (auto-revert)": "Joue l'expression choquée puis revient au sourire",
+        "→ Happy! (auto-revert)": "Joue le grand sourire puis revient",
+        "→ Wink! (rapid)": "Clin d'œil rapide (ferme-tient-rouvre)",
+        "→ Glance (side look)": "Le geste signature : coup d'œil + penché de tête Pixar",
+        "↺ Reset to Basis": "Remet toutes les shape keys à zéro",
+        // ⤳ Motion
+        "Mouse follow": "Lerp du suivi de position du curseur (plus haut = plus collant)",
+        "Pos lerp": "Inertie du corps vers sa cible",
+        "Gaze strength": "Force du regard vers le curseur (0.8 ≈ ±23° max)",
+        "Gaze depth": "Profondeur virtuelle du regard — plus bas = tourne plus fort pour un même écart",
+        "Gaze (pinned)": "Amorti du regard quand une pose est épinglée (ex. page contact)",
+        "Tilt speed": "Réactivité de la rotation de tête (lissage)",
+        // ≋ Ambient life
+        "Float amp": "Amplitude de la dérive flottante au repos (Lissajous)",
+        "Sway (deg)": "Balancement de rotation au repos (3 octaves incommensurables)",
+        "Breath amp": "Profondeur de la respiration (scale + posture couplées)",
+        "Breath Hz": "Rythme respiratoire (inspiration active, expiration lente)",
+        "Scroll lag": "Force de la traînée à contre-sens du scroll",
+        "Lag clamp": "Décalage maximal autorisé par le scroll",
+        // ↺ Rotation
+        "Rot X": "Pose de base : tangage (positif = penche vers le bas)",
+        "Rot Y": "Pose de base : lacet (positif = regarde à droite)",
+        "Rot Z": "Pose de base : roulis (penché de tête)",
+        "Tracked yaw": "Lacet épinglé en tracking — règle ici, reporte dans data-smiley-yaw (rester ≤ ±20°)",
+        "Tracked pitch": "Tangage épinglé en tracking — reporte dans data-smiley-pitch (rester ≤ ±20°)",
+        "Body color": "Couleur du corps (sphère + particules du morph)",
+        "Face color": "Couleur des yeux et de la bouche",
+      };
+      for (const c of gui.controllersRecursive()) {
+        const tip = TIPS[c._name];
+        if (tip) c.domElement.title = tip;
+      }
     });
   }
 
@@ -1469,7 +1593,7 @@ const updateMorph = (timeSec) => {
         1 -
         guiParams.morphShimmer *
           flight *
-          (0.5 + 0.5 * Math.sin(timeSec * 2.5 + d.wobPhase[i] * 9.0));
+          (0.5 + 0.5 * Math.sin(timeSec * 1.6 + d.wobPhase[i] * 9.0));
       morphDummy.scale.setScalar(
         Math.max(1e-4, env * shimmer * d.size[i] * (rA + (rB - rA) * p)),
       );
