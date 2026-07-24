@@ -1,12 +1,14 @@
 <template>
   <article class="project">
-    <NuxtImg
-      :src="project.image"
-      :alt="project.name"
-      width="1200"
-      height="800"
-      class="project__image"
-    />
+    <div class="project__media">
+      <NuxtImg
+        :src="project.image"
+        :alt="project.name"
+        width="1200"
+        height="800"
+        class="project__image"
+      />
+    </div>
     <div class="project-overview">
       <p class="project-overview__name t1-body">{{ project.name }}</p>
       <div class="project-overview__chips">
@@ -36,12 +38,16 @@ defineProps<{
 
 <style lang="scss" scoped>
 .project {
+  &__media {
+    position: relative;
+    z-index: 10;
+    overflow: hidden;
+  }
   &__image {
     width: 100%;
     height: auto;
     object-fit: cover;
-    position: relative;
-    z-index: 10;
+    display: block;
   }
   &-overview {
     display: flex;

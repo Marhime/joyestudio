@@ -1,4 +1,5 @@
-import type { TransitionProps } from "vue";
+import type { Ref, TransitionProps } from "vue";
+import type { SmileyAPI } from "~/types/smiley";
 
 /**
  * Callback type for page entrance animations.
@@ -48,7 +49,7 @@ export type PageEnterHook = (cb: () => void) => void;
  *     })
  *   })
  */
-export function usePageTransition() {
+export function usePageTransition(smiley?: Ref<SmileyAPI | null>) {
   // Singleton composable called from app.vue — not a component setup, so useGSAP()
   // is not appropriate. Direct nuxtApp access is correct for fire-and-forget ST calls.
   const nuxtApp = useNuxtApp();
@@ -58,6 +59,11 @@ export function usePageTransition() {
   const router = useRouter();
 
   const isTransitioning = ref(false);
+
+  const viewportCenter = () => ({
+    x: window.innerWidth / 2,
+    y: window.innerHeight / 2,
+  });
 
   // One-shot callback registered by the incoming page.
   // Fired in onAfterEnter — after dissolve, Lenis resume, and ST.refresh.
@@ -107,8 +113,12 @@ export function usePageTransition() {
       // Kill active ScrollTriggers (hero scrub etc.) before fill
       ScrollTrigger?.getAll?.()?.forEach((st: any) => st.kill(false));
 
-      // fill() returns a Promise — Vue awaits done(), blocking page swap
-      await grid.fill(pendingColor.value);
+      // The wall RADIATES from the smiley: it appears at his departure
+      // point and crystallizes outward from UNDER him — he holds his
+      // ground above it (his canvas out-z-indexes the grid), visibly the
+      // epicenter of the wall, never buried by it.
+      const seed = smiley?.value?.getScreenPosition() ?? viewportCenter();
+      await grid.fillRadial(pendingColor.value, seed);
 
       // Scroll to top while screen is covered
       (nuxtApp.$lenis as any)?.scrollTo?.(0, { immediate: true });
@@ -131,8 +141,19 @@ export function usePageTransition() {
 
       emit("page:enter", {});
 
-      // Dissolve reveals the new page — entrance animations are already in motion
-      await grid.dissolve();
+      // The wall BLOWS OPEN from the entry anchor — the landing zone
+      // clears first, so the smiley's comet (launched on the same beat,
+      // flying OVER the wall from his departure point) recondenses on a
+      // clean background while the wave sweeps to the edges.
+      const entry = document.querySelector<HTMLElement>("[data-smiley-entry]");
+      let seed = viewportCenter();
+      if (entry) {
+        const r = entry.getBoundingClientRect();
+        if (r.width > 4 && r.height > 4) {
+          seed = { x: r.left + r.width / 2, y: r.top + r.height / 2 };
+        }
+      }
+      await grid.dissolveRadial(seed);
 
       done();
     },

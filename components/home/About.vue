@@ -25,7 +25,9 @@
               ><span>a digital</span>
             </span>
           </span>
-          <span class="icon"
+          <span
+            class="icon"
+            @mouseenter="smiley.notice($event.currentTarget)"
             ><span class="right-arrow"> <RightArrow /></span
           ></span>
           <span class="line-container about__content-line--4">
@@ -33,7 +35,11 @@
           </span>
           <span class="line-container about__content-line--5">
             <span class="about__content-line font-italic font-como t2-h2"
-              ><span class="icon-mobile"><RightArrow /></span>
+              ><span
+                class="icon-mobile"
+                @mouseenter="smiley.notice($event.currentTarget)"
+                ><RightArrow /></span
+              >
               <span>as good as it looks</span></span
             >
           </span>
@@ -57,13 +63,19 @@
 
 <script setup>
 import RightArrow from "../icons/RightArrow.vue";
+import { useSmiley } from "~/composables/useSmiley";
 
 const { gsap, SplitText, mm, BP, scheduleRefresh } = useGSAP();
 
 const sectionRef = useTemplateRef("sectionRef");
 
+// Smiley API — the inline sphere glances toward hovered cues (the arrow)
+const smiley = useSmiley();
+
 // Sphère 3D fournie par le layout default via provide/inject
 const pixelBlob = inject("pixelBlob");
+// Transition en cours ? (app.vue) — gate le track au mount
+const isTransitioning = inject("isTransitioning", ref(false));
 
 let resizeHandler;
 
@@ -75,6 +87,14 @@ const setupAnimations = () => {
     const placeholder = document.querySelector("[hiye-face-placeholder]");
     if (!hiyeFace || !placeholder || !sectionRef.value) return;
 
+    // Trigger the whole About moment on the CONTENT, not the section: the
+    // section top sits ~30rem above the sentence, so a section-anchored scrub
+    // finished before the sentence was even read ("already revealed on arrival").
+    // Anchoring to .about__content shifts blob + text together (still synced),
+    // so the reveal now plays AS the sentence travels up through the viewport.
+    const contentEl = sectionRef.value.querySelector(".about__content");
+    if (!contentEl) return;
+
     // Scrubbed pixel transmogrification: the scroll drives the journey.
     // The ball erodes at the hero as its pixels physically detach, they
     // stream across in staggered individual arcs, and the ball reassembles
@@ -82,7 +102,7 @@ const setupAnimations = () => {
     if (pixelBlob?.value) {
       gsap.timeline({
         scrollTrigger: {
-          trigger: sectionRef.value,
+          trigger: contentEl,
           start: "top bottom",
           end: "top top",
           scrub: 0.7,
@@ -114,34 +134,25 @@ const setupAnimations = () => {
       margin: "-0.25em -0.06em",
     });
     gsap.set(titleSplit.lines, { yPercent: 100 });
-    gsap.to(titleSplit.lines, {
-      yPercent: 0,
-      duration: 0.9,
-      ease: "power3.out",
-      stagger: 0.1,
-      scrollTrigger: {
-        trigger: title[0],
-        start: "top 50%",
-        invalidateOnRefresh: true,
-      },
-    });
 
     // Build animation targets in DOM order so stagger is sequential.
     // Line-3 excluded from SplitText (wrappers break its flex layout).
     // Icon is a sibling between line-3 and line-4 — iterated via parent children.
     const splits = [];
     const allTargets = [];
-    const contentEl = sectionRef.value.querySelector(".about__content");
 
+    let arrowEl = null; // the → drives in LAST and shoves line-4 (not in the rise)
+    let line4El = null; // "presence that feels" — the line the arrow pushes
     for (const child of contentEl.children) {
-      // Arrow icon between line-3 and line-4
+      // Arrow icon between line-3 and line-4 — handled separately (see push below)
       if (child.classList.contains("icon")) {
-        const arrow = child.querySelector(".right-arrow");
-        if (arrow) allTargets.push(arrow);
+        arrowEl = child.querySelector(".right-arrow");
         continue;
       }
       const line = child.querySelector(".about__content-line");
       if (!line) continue;
+
+      if (child.classList.contains("about__content-line--4")) line4El = child;
 
       if (child.classList.contains("about__content-line--3")) {
         // Line-3: animate as a whole block (SplitText breaks its flex layout)
@@ -158,17 +169,54 @@ const setupAnimations = () => {
     gsap.set(allMasks, { padding: "0.25em 0.06em", margin: "-0.25em -0.06em" });
 
     gsap.set(allTargets, { yPercent: 132 });
-    gsap.to(allTargets, {
-      yPercent: 0,
-      duration: 0.9,
-      ease: "power3.out",
-      stagger: 0.03,
+    // Arrow starts off-screen LEFT; line-4 pre-offset left so the arrow has
+    // room to shove it back to 0 (revealed displaced → pushed, no jump).
+    if (arrowEl) gsap.set(arrowEl, { xPercent: -180, autoAlpha: 0 });
+    if (line4El) gsap.set(line4El, { x: -40 });
+
+    // ── Entrance scrubbed to the blob morph ───────────────────────────────
+    // The pixel stream is scroll-driven (scrub 0.7); the sentence used to
+    // POP on a separate trigger — two clocks on one moment, hence the
+    // "they don't go together" feel. Now the title + sentence ride the SAME
+    // scroll window with the SAME scrub lag, composing as the pixels stream
+    // and docking exactly as the ball reassembles into the placeholder.
+    const entrance = gsap.timeline({
       scrollTrigger: {
-        trigger: sectionRef.value,
-        start: "50% 75%",
+        trigger: contentEl,
+        start: "top bottom",
+        end: "top top",
+        scrub: 0.7,
         invalidateOnRefresh: true,
       },
     });
+    // Title rises early as the section climbs into view…
+    entrance.to(
+      titleSplit.lines,
+      { yPercent: 0, ease: "power3.out", stagger: 0.1, duration: 0.4 },
+      0.05,
+    );
+    // …the sentence composes through the back half — the words settle as
+    // the streaming pixels dock into the sentence (blob morph end = here).
+    entrance.to(
+      allTargets,
+      { yPercent: 0, ease: "power3.out", stagger: 0.03, duration: 0.6 },
+      0.4,
+    );
+    // …then, as a final beat still on the SAME scroll clock, the → drives in
+    // from the left and shoves "presence that feels" to the right (recoil +
+    // settle). Kept on the scrub so it never desyncs from the compose.
+    if (arrowEl)
+      entrance.to(
+        arrowEl,
+        { xPercent: 0, autoAlpha: 1, ease: "power3.out", duration: 0.28 },
+        0.9,
+      );
+    if (line4El)
+      entrance.to(
+        line4El,
+        { x: 0, ease: "back.out(1.8)", duration: 0.28 },
+        0.96,
+      );
 
     const textWrapper = sectionRef.value.querySelector(".text-wrapper p");
     const splitText = new SplitText(textWrapper, {
@@ -184,6 +232,7 @@ const setupAnimations = () => {
       scrollTrigger: {
         trigger: textWrapper,
         start: "top 75%",
+        toggleActions: "play none none reverse",
         invalidateOnRefresh: true,
       },
     });
@@ -195,11 +244,15 @@ const setupAnimations = () => {
     const placeholder = document.querySelector("[hiye-face-placeholder]");
     if (!hiyeFace || !placeholder || !sectionRef.value) return;
 
+    // Anchor the scrub to the CONTENT (not the section top) — see desktop note.
+    const contentEl = sectionRef.value.querySelector(".about__content");
+    if (!contentEl) return;
+
     // Scrubbed pixel transmogrification — same as desktop.
     if (pixelBlob?.value) {
       gsap.timeline({
         scrollTrigger: {
-          trigger: sectionRef.value,
+          trigger: contentEl,
           start: "top bottom",
           end: "top top",
           scrub: 0.7,
@@ -227,7 +280,6 @@ const setupAnimations = () => {
     // Same approach as desktop — iterate .about__content children in DOM order.
     const splits = [];
     const allTargets = [];
-    const contentEl = sectionRef.value.querySelector(".about__content");
 
     for (const child of contentEl.children) {
       if (child.classList.contains("icon")) {
@@ -252,17 +304,23 @@ const setupAnimations = () => {
     gsap.set(allMasks, { padding: "0.25em 0.06em", margin: "-0.25em -0.06em" });
 
     gsap.set(allTargets, { yPercent: 110 });
-    gsap.to(allTargets, {
-      yPercent: 0,
-      duration: 0.8,
-      ease: "power3.out",
-      stagger: 0.02,
+
+    // Scrubbed to the blob morph window — same as desktop: the sentence
+    // composes as the pixels stream in, one coupled move (no triggered pop).
+    const entrance = gsap.timeline({
       scrollTrigger: {
-        trigger: sectionRef.value,
-        start: "50% 80%",
+        trigger: contentEl,
+        start: "top bottom",
+        end: "top top",
+        scrub: 0.7,
         invalidateOnRefresh: true,
       },
     });
+    entrance.to(
+      allTargets,
+      { yPercent: 0, ease: "power3.out", stagger: 0.02, duration: 0.6 },
+      0.4,
+    );
 
     return () => {};
   });
@@ -284,9 +342,12 @@ onMounted(() => {
   nextTick(() => {
     setupAnimations();
 
-    // Tracking temps réel — la sphère 3D suit l'élément hiye-face
+    // Tracking temps réel — la sphère 3D suit l'élément hiye-face.
+    // Chargement direct uniquement : pendant une transition, l'acteur
+    // possède la boule (hold au-dessus du mur puis vol vers l'ancre) —
+    // un track au mount la téléporterait en plein hold.
     const hiyeFaceEl = document.querySelector("[hiye-face]");
-    if (hiyeFaceEl) {
+    if (hiyeFaceEl && !isTransitioning.value) {
       pixelBlob?.value?.startTracking(hiyeFaceEl);
     }
   });
@@ -317,6 +378,10 @@ onUnmounted(() => {
     .face-placeholder {
       display: inline-block;
       width: 6rem;
+      // Square slot: domRectToWorld sizes the ball on min(width, height) —
+      // a height-less inline-block collapses to 0 and the tracked ball
+      // vanishes (mobile had no height, so the About ball never landed).
+      height: 6rem;
       @include respond-to("desktop") {
         width: 13rem;
         height: 13rem;

@@ -90,6 +90,22 @@ export interface SmileyDissolveOptions {
 export type SmileyExpression = "shocked" | "happy" | "wink";
 
 /**
+ * Anything morphScrub can fly between: a real DOM element, or a virtual
+ * anchor that quacks like one (fixed viewport rect + optional data attrs).
+ * Virtual anchors let time-driven flights depart from off-screen points
+ * that no element occupies (e.g. above the fold during a page transition).
+ */
+export interface SmileyMorphAnchor {
+  getBoundingClientRect: () => {
+    left: number;
+    top: number;
+    width: number;
+    height: number;
+  };
+  dataset: DOMStringMap | Record<string, string | undefined>;
+}
+
+/**
  * Public contract exposed by PixelBlob3 via defineExpose.
  * useSmiley.ts consumes this type — nothing else should import PixelBlob3 directly.
  */
@@ -136,6 +152,20 @@ export interface SmileyAPI {
   clearScrub: () => void;
 
   /**
+   * Freeze at the current world position/scale (page-transition hold).
+   * A moving hold: breath/hover life keeps running while the base is
+   * parked. Use before a page swap detaches the tracked anchors.
+   */
+  hold: () => void;
+
+  /**
+   * A virtual anchor standing exactly where the ball is now, sized so the
+   * tracking formula reproduces the current scale — the departure slot of
+   * a page-transition flight (no size jump at t=0). Null before init.
+   */
+  getSelfAnchor: () => SmileyMorphAnchor | null;
+
+  /**
    * Tween a shape-key expression on the mouth mesh.
    *   setExpression('shocked')               → tween to fully shocked
    *   setExpression('shocked', 0)            → tween back to smile
@@ -165,6 +195,15 @@ export interface SmileyAPI {
   /** Set the dissolve amount directly (0 = intact, 1 = dispersed). */
   setDissolve: (v: number) => void;
 
+  /** Current dissolve amount (0 = intact, 1 = dispersed). */
+  getDissolve: () => number;
+
+  /**
+   * Ball center + visual radius in viewport CSS px (y top-down), or null
+   * before init. Used to seed the page-transition wall wavefront.
+   */
+  getScreenPosition: () => { x: number; y: number; r: number } | null;
+
   /**
    * Pixel comet: scatter into a pixel cloud in place, stream across the
    * screen to the target (cells stretch along the flight), recondense on
@@ -177,9 +216,23 @@ export interface SmileyAPI {
    * Scrub-driven pixel transmogrification between two DOM anchors:
    * t=0 intact at `fromEl` … t=1 intact at `toEl`; in between the ball's
    * pixels physically detach, fly staggered arcs and reassemble.
-   * Call every scrub tick with the live progress.
+   * Call every scrub tick with the live progress. Anchors may be real
+   * elements or virtual rect-like anchors; pass (0, null, null) to reset
+   * a parked morph (e.g. before a page swap invalidates its elements).
    */
-  morphScrub: (t: number, fromEl: HTMLElement, toEl: HTMLElement) => void;
+  morphScrub: (
+    t: number,
+    fromEl: HTMLElement | SmileyMorphAnchor | null,
+    toEl: HTMLElement | SmileyMorphAnchor | null,
+    opts?: {
+      /**
+       * true (default) = magician's clock: swarm pours only once the
+       * departure ball is off-screen (scroll morphs). false = the whole
+       * journey plays on screen (page-transition flight).
+       */
+      gated?: boolean;
+    },
+  ) => void;
 
   /** Access the Three.js camera for domRectToWorld calculations. */
   getCamera: () => any;

@@ -57,6 +57,10 @@ let viewportWorldH = 372;
 const meshes = []; // sphere sub-meshes with shader → shared uniform updates
 let featureMeshes = []; // eyes + mouth → MeshBasicMaterial
 let mouthMesh = null; // reference to the mouth (Cylinder) for shape-key control
+// Measured at GLB load: the pixel body is NOT a unit sphere — geoRadius
+// maps scale-units (props.radius, tracking scale) to the VISUAL radius.
+// The GLB is recentered at load so mesh.position ≡ ball center.
+let geoRadius = 1;
 const mouse = new THREE.Vector2(0.5, 0.5);
 const followMouse = new THREE.Vector2(0.5, 0.5);
 const velocityDir = new THREE.Vector2(0, 0);
@@ -173,9 +177,11 @@ const ensureMorphParticles = () => {
     randUnit(morphData.dirA, i);
     randUnit(morphData.dirB, i);
     morphData.stag[i] = Math.random();
-    // Power-law sizes: lots of dust, a few chunky blocks — matches the
-    // sphere shader's cell range (its cells grow ×2.5 while dissolving)
-    morphData.size[i] = 0.028 + 0.075 * Math.pow(Math.random(), 2.2);
+    // Matter-true sizes: every particle is a WHOLE pixel of the shared
+    // grain — mostly 1×1, a few 2×2 "still glued" chunks for rhythm.
+    // Stored in grain multiples; world size resolved per-frame in
+    // updateMorph (the grain is a screen-space constant).
+    morphData.size[i] = Math.random() < 0.85 ? 1 : 2;
     morphData.sag[i] = 0.5 + Math.random();
     morphData.wobAmp[i] = 4 + Math.random() * 11;
     morphData.wobFreq[i] = 1.5 + Math.random() * 2.2;
@@ -223,7 +229,7 @@ const guiParams = {
   idleBreathFreq: 0.4, // breaths per second (Hz)
   // ── Pixel cells
   screenSpaceCells: true, // true = screen-aligned squares (same matter as morph/grid)
-  cellRatio: 0.05, // screen cell size as fraction of the ball's screen radius
+  matterPx: 10, // the pixel ATOM: screen grain (CSS px) shared by ball cells & morph particles
   // ── Ambient life (always-on, all modes)
   idleFloatAmp: 7, // world-units Lissajous drift amplitude
   idleSwayDeg: 2, // slow rotation sway amplitude (degrees)
@@ -268,6 +274,13 @@ const guiParams = {
   rotZ: -1,
 };
 
+// The matter grain: ONE constant screen-space pixel size (CSS px) shared by
+// the sphere's cells and the morph particles — a bigger ball means MORE
+// pixels, never bigger ones. Clamped so tiny balls (mobile inline anchor)
+// keep ≥ ~9 cells across and still read as a ball.
+const matterGrainPx = (radiusCssPx) =>
+  Math.max(3, Math.min(guiParams.matterPx, radiusCssPx / 4.5));
+
 // ─── Shaders ───────────────────────────────────────────────────────────────
 
 const vertexShader = /* glsl */ `
@@ -275,10 +288,19 @@ const vertexShader = /* glsl */ `
   varying vec3 vViewPosition;
   varying vec2 vUv;
 
+  // Rasterization halo: in screen-space mode the fragment alpha is fully
+  // analytic (cell-center math), but fragments only exist where the mesh
+  // rasterizes — inflate the geometry (around ITS own center, which may
+  // be offset from the node origin) so silhouette cells get FULL coverage
+  // instead of being sliced by the smooth sphere edge.
+  uniform float uInflate;
+  uniform vec3  uGeoCenter;
+
   void main() {
     vUv      = uv;
     vNormal  = normalize(normalMatrix * normal);
-    vec4 mvp = modelViewMatrix * vec4(position, 1.0);
+    vec3 inflated = (position - uGeoCenter) * uInflate + uGeoCenter;
+    vec4 mvp = modelViewMatrix * vec4(inflated, 1.0);
     vViewPosition = mvp.xyz;
     gl_Position   = projectionMatrix * mvp;
   }
@@ -305,62 +327,68 @@ const fragmentShader = /* glsl */ `
   uniform float uCoarseRatio;  // layer-2 cell size multiplier
   uniform float uDissolve;     // 0 = intact … 1 = fully dispersed pixel cloud
   uniform float uScreenSpace;  // 1 = axis-aligned screen-space square cells
-  uniform float uScreenCell;   // screen-space cell size (physical px)
+  uniform float uScreenCell;   // the matter grain: cell size (physical px)
   uniform vec2  uBallScreen;   // ball center in physical px — grid anchor
+  uniform vec2  uBallRadius;   // ball radius in physical px (x/y for squash)
 
   void main() {
-    // Fresnel: 1 at center, 0 at silhouette
-    float facing = max(0.0, dot(normalize(vNormal), -normalize(vViewPosition)));
+    vec2 velSafe = normalize(uVeloDir + vec2(0.001));
 
-    // Which side of the sphere is trailing?
-    // +1 = leading edge (front of movement), -1 = trailing edge (back)
-    vec2 velSafe   = normalize(uVeloDir + vec2(0.001));
-    float trailDot = dot(normalize(vNormal.xy + vec2(0.001)), velSafe);
-    float trailBias = (1.0 - trailDot) * 0.5; // 0 at leading, 1 at trailing
+    // Cells stretch in movement direction proportionally to trail strength.
+    // HARD gate on the dissolve: a dissolving ball is loose pixels and
+    // pixels are square — a linear damp is not enough because uTrail is
+    // itself boosted by the dissolve (scrubTrail + uDissolve terms would
+    // smear the reforming ball into bars). The erosion's direction reads
+    // through the spray asymmetry (uVeloDir → trailBias), never through
+    // smearing. Cell SIZE never changes either: one matter, one grain.
+    float stretch = uTrail * uTrailStretch
+                  * (1.0 - smoothstep(0.05, 0.25, uDissolve));
+
+    float facing; float trailBias;
+    float cx; float cy; float cx2; float cy2;
+
+    if (uScreenSpace > 0.5) {
+      // ── Screen-space matter: TRUE axis-aligned squares on ONE grain —
+      // the exact lattice the morph particles launch from and dock into.
+      // The grid is ANCHORED to the ball's center (not the screen): it
+      // translates rigidly with the ball, so ambient drift never
+      // re-rasterizes the edge (no boiling) — only the hash flicker
+      // animates. Fresnel + comet bias are evaluated at the CELL CENTER
+      // from the analytic ball, so every cell is uniformly on or off:
+      // the silhouette itself becomes pixel steps — a smooth arc never
+      // slices through a square.
+      float sx = uScreenCell * (1.0 + stretch * abs(velSafe.x));
+      float sy = uScreenCell * (1.0 + stretch * abs(velSafe.y));
+      vec2 sc = gl_FragCoord.xy - uBallScreen;
+      cx  = floor(sc.x / sx);
+      cy  = floor(sc.y / sy);
+      cx2 = floor((sc.x + sx * 0.7) / (sx * uCoarseRatio));
+      cy2 = floor((sc.y + sy * 0.4) / (sy * uCoarseRatio));
+      vec2 cc = vec2((cx + 0.5) * sx, (cy + 0.5) * sy) / uBallRadius;
+      facing = sqrt(max(0.0, 1.0 - dot(cc, cc)));
+      trailBias = (1.0 - dot(normalize(cc + vec2(0.0001)), velSafe)) * 0.5;
+    } else {
+      // ── Surface-space cells (legacy look): painted on the sphere's UV,
+      // curved and foreshortened by the 3D projection. Per-fragment
+      // fresnel from the real normals.
+      facing = max(0.0, dot(normalize(vNormal), -normalize(vViewPosition)));
+      trailBias = (1.0 - dot(normalize(vNormal.xy + vec2(0.001)), velSafe)) * 0.5;
+      vec2 velPerp  = vec2(-velSafe.y, velSafe.x);
+      float uvAlong = dot(vUv - 0.5, velSafe);
+      float uvPerp  = dot(vUv - 0.5, velPerp);
+      float psAlong = uPixelSize * (1.0 + stretch);
+      float psPerp  = uPixelSize;
+      cx  = floor(uvAlong / psAlong);
+      cy  = floor(uvPerp  / psPerp);
+      cx2 = floor((uvAlong + psAlong * 0.7) / (psAlong * uCoarseRatio));
+      cy2 = floor((uvPerp  + psPerp  * 0.4) / (psPerp  * uCoarseRatio));
+    }
 
     // Trailing edge dissolves much more than leading edge.
     // uDissolve widens the dissolution zone over the WHOLE sphere — the
     // same silhouette-spray language, pushed inward until only sparse
     // scattered cells remain (the smiley "becomes pixels").
     float t = clamp(facing / (uEdgeWidth + uTrail * trailBias * uTrailBias + uDissolve * 2.5), 0.0, 1.0);
-
-    // Cells stretch in movement direction proportionally to trail strength.
-    // While dissolving, the stretch is damped HARD (85%) so cells stay
-    // near-square like the morph particles — the erosion's direction reads
-    // through the spray asymmetry, not through smearing — and they grow
-    // moderately into chunky confetti.
-    float stretch   = uTrail * uTrailStretch * (1.0 - 0.85 * uDissolve);
-    float cellScale = 1.0 + uDissolve * 1.0;
-
-    float cx; float cy; float cx2; float cy2;
-    if (uScreenSpace > 0.5) {
-      // ── Screen-space cells: TRUE squares, axis-aligned — the exact same
-      // matter as the morph particles and the transition grid. The grid is
-      // ANCHORED to the ball's center (not the screen): it translates
-      // rigidly with the ball, so the ambient drift never re-rasterizes
-      // the edge (no boiling) — only the deliberate hash flicker animates.
-      // Stretch elongates cells along the dominant movement axis only, so
-      // they stay axis-aligned rectangles.
-      float sx = uScreenCell * (1.0 + stretch * abs(velSafe.x)) * cellScale;
-      float sy = uScreenCell * (1.0 + stretch * abs(velSafe.y)) * cellScale;
-      vec2 sc = gl_FragCoord.xy - uBallScreen;
-      cx  = floor(sc.x / sx);
-      cy  = floor(sc.y / sy);
-      cx2 = floor((sc.x + sx * 0.7) / (sx * uCoarseRatio));
-      cy2 = floor((sc.y + sy * 0.4) / (sy * uCoarseRatio));
-    } else {
-      // ── Surface-space cells (legacy look): painted on the sphere's UV,
-      // curved and foreshortened by the 3D projection.
-      vec2 velPerp  = vec2(-velSafe.y, velSafe.x);
-      float uvAlong = dot(vUv - 0.5, velSafe);
-      float uvPerp  = dot(vUv - 0.5, velPerp);
-      float psAlong = uPixelSize * (1.0 + stretch) * cellScale;
-      float psPerp  = uPixelSize * cellScale;
-      cx  = floor(uvAlong / psAlong);
-      cy  = floor(uvPerp  / psPerp);
-      cx2 = floor((uvAlong + psAlong * 0.7) / (psAlong * uCoarseRatio));
-      cy2 = floor((uvPerp  + psPerp  * 0.4) / (psPerp  * uCoarseRatio));
-    }
 
     float r1  = fract(sin(cx  * 127.1 + cy  * 311.7 + uTick * 57.3) * 43758.5);
     float r2  = fract(sin(cx2 * 269.5 + cy2 * 183.3 + uTick * 31.7) * 23421.6);
@@ -518,19 +546,24 @@ const animate = (now) => {
   const sq = glanceState.squash;
   mesh.scale.set(s * (1 - sq), s * (1 + sq), s);
 
-  // Velocity tracking
-  const vx = mesh.position.x - prevPos.x;
-  const vy = mesh.position.y - prevPos.y;
-  const speed = Math.sqrt(vx * vx + vy * vy);
-  moveSpeed += (speed - moveSpeed) * 0.12;
+  // Velocity tracking. During a morph the pipeline is bypassed entirely:
+  // the magician's-clock warp (ball teleports A→B mid-flight) would spike
+  // moveSpeed and smear the reforming cells into bars — scrubTrail owns
+  // the morph's comet story, and updateMorph() aims velocityDir itself.
+  if (morphState.active) {
+    prevPos.set(mesh.position.x, mesh.position.y);
+    moveSpeed *= 0.85; // drain any pre-morph residue
+  } else {
+    const vx = mesh.position.x - prevPos.x;
+    const vy = mesh.position.y - prevPos.y;
+    const speed = Math.sqrt(vx * vx + vy * vy);
+    moveSpeed += (speed - moveSpeed) * 0.12;
 
-  // During a morph, velocityDir is hijacked by updateMorph() to aim the
-  // shader's directional spray along the travel axis — the mesh chasing
-  // its scrolling anchor must not overwrite that story.
-  if (speed > 0.001 && !morphState.active) {
-    const inv = 1.0 / speed;
-    velocityDir.x += (vx * inv - velocityDir.x) * 0.15;
-    velocityDir.y += (vy * inv - velocityDir.y) * 0.15;
+    if (speed > 0.001) {
+      const inv = 1.0 / speed;
+      velocityDir.x += (vx * inv - velocityDir.x) * 0.15;
+      velocityDir.y += (vy * inv - velocityDir.y) * 0.15;
+    }
   }
   // When speed drops below the threshold, freeze velocityDir instead of
   // multiplying it by 0.92. The shader uses normalize(uVeloDir + 0.001) to
@@ -543,16 +576,23 @@ const animate = (now) => {
   const clamped = Math.min(moveSpeed * 0.025, 0.12);
   smoothVelo += (clamped - smoothVelo) * 0.08;
 
-  // Screen-space cell size scales with the ball's on-screen radius so the
-  // pixel density stays consistent from hero size down to inline size.
-  // The grid anchor follows the ball's projected center (physical px) so
-  // ambient drift moves the grid WITH the ball instead of through it.
+  // One matter, one grain: the cell size is CONSTANT on screen (the pixel
+  // is the smiley's atom) — hero ball, inline ball and morph particles all
+  // share it. The grid anchor follows the ball's projected center
+  // (physical px) so ambient drift moves the grid WITH the ball instead
+  // of through it.
   const canvasH = renderer.domElement.clientHeight || window.innerHeight;
   const canvasW = renderer.domElement.clientWidth || window.innerWidth;
   const pr = renderer.getPixelRatio();
-  const screenCellPx =
-    Math.max(3, (mesh.scale.y / viewportWorldH) * canvasH * guiParams.cellRatio) *
-    pr;
+  const ballRadiusCssX = (mesh.scale.x * geoRadius / viewportWorldH) * canvasH;
+  const ballRadiusCssY = (mesh.scale.y * geoRadius / viewportWorldH) * canvasH;
+  const grainCss = matterGrainPx(ballRadiusCssY);
+  const screenCellPx = grainCss * pr;
+  // Rasterization halo: enough geometry overdraw beyond the smooth
+  // silhouette for ~2.5 rings of full edge cells (see uInflate).
+  const inflate = guiParams.screenSpaceCells
+    ? Math.min(1.6, 1 + (2.5 * grainCss) / Math.max(ballRadiusCssY, 1))
+    : 1;
   const ballScreenX =
     (mesh.position.x / (viewportWorldH * camera.aspect) + 0.5) * canvasW * pr;
   const ballScreenY =
@@ -574,6 +614,8 @@ const animate = (now) => {
     u.uScreenSpace.value = guiParams.screenSpaceCells ? 1 : 0;
     u.uScreenCell.value = screenCellPx;
     u.uBallScreen.value.set(ballScreenX, ballScreenY);
+    u.uBallRadius.value.set(ballRadiusCssX * pr, ballRadiusCssY * pr);
+    u.uInflate.value = inflate;
   }
 
   // Face features can't dissolve through the pixel shader (MeshBasic) —
@@ -763,6 +805,9 @@ const init = () => {
         uScreenSpace: { value: 1 },
         uScreenCell: { value: 12 },
         uBallScreen: { value: new THREE.Vector2(0, 0) },
+        uBallRadius: { value: new THREE.Vector2(1, 1) },
+        uInflate: { value: 1 },
+        uGeoCenter: { value: new THREE.Vector3(0, 0, 0) },
       },
       transparent: true,
       depthWrite: false,
@@ -800,9 +845,30 @@ const init = () => {
       } else {
         // Sphere → full pixel shader
         child.material = makeMaterial(guiParams.color);
+        // Inflation pivot: the geometry's own local center (may be offset
+        // from the node origin in the GLB).
+        child.geometry.computeBoundingSphere();
+        child.material.uniforms.uGeoCenter.value.copy(
+          child.geometry.boundingSphere.center,
+        );
         meshes.push(child);
       }
     });
+    // ── Normalize the GLB ────────────────────────────────────────────
+    // The authored body is neither a unit sphere nor centered on the node
+    // origin. Recenter so mesh.position ≡ the ball's visual center (the
+    // analytic shader disc, the morph lattice and the DOM anchors must
+    // all agree on ONE center), and measure geoRadius so scale-units map
+    // exactly to the visual radius everywhere.
+    gltf.scene.updateMatrixWorld(true);
+    const bodyBounds = new THREE.Box3();
+    for (const m of meshes) bodyBounds.expandByObject(m);
+    const bodyCenter = bodyBounds.getCenter(new THREE.Vector3());
+    const bodySize = bodyBounds.getSize(new THREE.Vector3());
+    gltf.scene.position.sub(bodyCenter);
+    // Half-extent, NOT Box3.getBoundingSphere (that circumscribes the box
+    // corners — ×√3 too big for a sphere). x/y only: the screen-facing disc.
+    geoRadius = Math.max(bodySize.x, bodySize.y) / 2;
     mesh.add(gltf.scene);
     // Basis is the default state (all morph influences = 0 by default).
 
@@ -813,6 +879,8 @@ const init = () => {
         if (c.isMesh) allMeshNames.push(c.name);
       });
       console.log("[PixelBlob3] GLB loaded:", {
+        geoRadius,
+        geoCenter: bodyCenter.toArray(),
         allMeshes: allMeshNames,
         featureMeshes: featureMeshes.map((m) => ({
           name: m.name,
@@ -868,8 +936,8 @@ const init = () => {
         .add(guiParams, "screenSpaceCells")
         .name("Screen-space px");
       fAppear
-        .add(guiParams, "cellRatio", 0.02, 0.12, 0.002)
-        .name("Cell size ratio");
+        .add(guiParams, "matterPx", 4, 16, 1)
+        .name("Matter grain (px)");
 
       // ── Morph flight — pixel-perfect tuning of the transmogrification.
       // "Scrub (test)" drives the morph by hand, frame by frame, using the
@@ -1110,12 +1178,12 @@ const init = () => {
         "Hover offset": "Amplitude du décalage organique vers le curseur en mode tracking",
         "Dissolve (test)": "Pilote la désagrégation à la main (0 = intact, 1 = dispersé) — pour figer un stade",
         "Screen-space px": "ON : cellules carrées alignées écran (même matière que particules/grille). OFF : cellules collées sur la sphère, courbées par la 3D",
-        "Cell size ratio": "Taille des cellules écran en fraction du rayon apparent — densité constante à toutes les tailles",
+        "Matter grain (px)": "L'ATOME de matière : taille d'un pixel en px écran, commune à la boule ET aux particules du vol (clampée sur les toutes petites boules)",
         // ✦ Morph flight
         "Arc sag": "Affaissement des trajectoires de vol (la gravité du flux, en unités monde)",
         "Wobble": "Amplitude de la serpentine des particules en vol",
         "Drift": "Dérive lente le long de l'axe de vol (vie du nuage)",
-        "Shimmer": "Respiration de taille des particules en vol (trop haut = clignotement)",
+        "Shimmer": "Fraction de pixels qui clignotent en vol (flicker discret, jamais de scale continu)",
         "Crawl speed": "Vitesse de vie du nuage quand le scroll est parké (rampement de phase)",
         "Exit teaser": "Érosion du bord haut quand la boule sort du viewport (l'avant-goût du tour)",
         "Trail boost": "Intensité de l'érosion directionnelle de la boule pendant le morph (les barres)",
@@ -1226,6 +1294,52 @@ const setScrubPosition = (x, y, s) => {
 const clearScrub = () => {
   isScrubbing.value = false;
   mode.value = "free";
+};
+
+/** Current base position (before ambient offsets) in world units. */
+const currentBase = () => {
+  const usingBase = isTracking.value || isScrubbing.value;
+  return {
+    x: usingBase ? trackedBase.x : (mesh?.position.x ?? 0),
+    y: usingBase ? trackedBase.y : (mesh?.position.y ?? 0),
+  };
+};
+
+/**
+ * A virtual anchor standing exactly where the ball is NOW (fixed viewport
+ * rect, no data attrs), sized so the tracking formula reproduces the
+ * current baseScale exactly — the departure slot of a page-transition
+ * flight. Both flight ends go through the same trackingScale path, so
+ * lattice parity is exact and there is no size jump at t=0.
+ */
+const getSelfAnchor = () => {
+  if (!renderer || !camera || !mesh) return null;
+  const cw = renderer.domElement.clientWidth || window.innerWidth;
+  const ch = renderer.domElement.clientHeight || window.innerHeight;
+  const { x, y } = currentBase();
+  const sizePx =
+    ((baseScale / guiParams.trackingScale) * 2 * ch) / viewportWorldH;
+  const rect = {
+    left: (x / (viewportWorldH * camera.aspect) + 0.5) * cw - sizePx / 2,
+    top: (0.5 - y / viewportWorldH) * ch - sizePx / 2,
+    width: sizePx,
+    height: sizePx,
+  };
+  return { getBoundingClientRect: () => rect, dataset: {} };
+};
+
+/**
+ * Freeze at the CURRENT world position/scale (page-transition hold).
+ * Tracking would read anchors of a page about to detach; free mode would
+ * drift to the cursor. Scrub mode parks the base while breath/hover life
+ * keeps running — a moving hold, never true immobility. The hover offset
+ * is subtracted here because the scrub branch re-adds it every frame.
+ */
+const hold = () => {
+  if (!mesh) return;
+  const ox = (followMouse.x - 0.5) * guiParams.hoverOffset;
+  const oy = (followMouse.y - 0.5) * guiParams.hoverOffset;
+  setScrubPosition(mesh.position.x - ox, mesh.position.y - oy, baseScale);
 };
 
 /** Case-insensitive lookup of a shape key index on the mouth mesh. */
@@ -1433,18 +1547,32 @@ const dissolveTo = (el, opts = {}) => {
 // motion is computed in animate() every frame, so the swarm keeps living
 // (time-driven wobble, drift, shimmer) even when the scroll is parked
 // mid-flight — matching the sphere shader's ever-flickering cells.
-const morphState = { active: false, t: 0, tStart: 0, fromEl: null, toEl: null };
+const morphState = {
+  active: false,
+  t: 0,
+  tStart: 0,
+  fromEl: null,
+  toEl: null,
+  gated: true,
+};
 let scrubTrail = 0; // directional-erosion boost on uTrail during the morph
 
 /**
  * Scrub-driven pixel transmogrification between two DOM anchors.
  * t=0 → intact ball tracking `fromEl`; t=1 → intact ball tracking `toEl`.
  * Call every scrub tick with the live progress — rendering runs per-frame.
+ *
+ * opts.gated (default true) = the magician's clock: the swarm only pours
+ * once the departure ball has scrolled OUT of the viewport (scroll-driven
+ * morphs infer the dissolve off-screen). gated:false = the whole journey
+ * plays ON SCREEN (page-transition flight): the ball erodes in place, its
+ * pixels arc across, it reforms at the target — both ends visible.
  */
-const morphScrub = (t, fromEl, toEl) => {
+const morphScrub = (t, fromEl, toEl, opts = {}) => {
   morphState.t = t;
   morphState.fromEl = fromEl;
   morphState.toEl = toEl;
+  morphState.gated = opts.gated !== false;
   morphState.active = t > 0.001 && t < 0.999 && !!fromEl && !!toEl;
   if (!morphState.active) {
     // Reset the internal clock ONLY when leaving through the START.
@@ -1483,8 +1611,13 @@ const updateMorph = (timeSec) => {
   );
   const mulA = parseFloat(morphState.fromEl.dataset.smileyScale) || 1;
   const mulB = parseFloat(morphState.toEl.dataset.smileyScale) || 1;
+  // rA/rB are SCALE units (fed to setScrubPosition); rAv/rBv are the
+  // VISUAL radii — what the shader disc actually covers on screen — used
+  // for the exit gate, the lattice slots, the grain and the z bulge.
   const rA = (A.worldSize / 2) * guiParams.trackingScale * mulA;
   const rB = (B.worldSize / 2) * guiParams.trackingScale * mulB;
+  const rAv = rA * geoRadius;
+  const rBv = rB * geoRadius;
 
   morphTravel.set(B.x - A.x, B.y - A.y);
   const dist = morphTravel.length() || 1;
@@ -1501,17 +1634,19 @@ const updateMorph = (timeSec) => {
   // the scroll remaining after the exit; the gate eases it continuously
   // so reverse-scrub re-entry never pops.
   const vh2 = viewportWorldH / 2;
-  const e = sstep(vh2 - rA, vh2 + rA * 0.8, A.y); // 0 visible … 1 fully out
-  if (e < 0.995) morphState.tStart = t;
-  const gate = sstep(0.75, 0.98, e);
-  const tm =
-    Math.min(
-      1,
-      Math.max(
-        0,
-        (t - morphState.tStart) / Math.max(0.05, 1 - morphState.tStart),
-      ),
-    ) * gate;
+  const gated = morphState.gated;
+  const e = gated ? sstep(vh2 - rAv, vh2 + rAv * 0.8, A.y) : 1; // 0 visible … 1 out
+  if (gated && e < 0.995) morphState.tStart = t;
+  const gate = gated ? sstep(0.75, 0.98, e) : 1;
+  const tm = gated
+    ? Math.min(
+        1,
+        Math.max(
+          0,
+          (t - morphState.tStart) / Math.max(0.05, 1 - morphState.tStart),
+        ),
+      ) * gate
+    : t;
 
   // The ball never travels: intact at A until off-screen (a whisper of
   // top-edge erosion as it exits foreshadows the trick), then reassembles
@@ -1522,8 +1657,14 @@ const updateMorph = (timeSec) => {
   velocityDir.x = atA ? -morphTravel.x : morphTravel.x;
   velocityDir.y = atA ? -morphTravel.y : morphTravel.y;
   dissolveTl?.kill();
+  // Departure erosion: gated flights only tease the top edge (the real
+  // dissolve is inferred off-screen); ungated flights erode the WHOLE
+  // ball on screen — fully dispersed just before the invisible A→B swap
+  // at tm 0.35, so the airborne pixels alone carry the continuity.
   dissolveState.v = atA
-    ? guiParams.morphExitTeaser * e
+    ? gated
+      ? guiParams.morphExitTeaser * e
+      : sstep(0.04, 0.32, tm)
     : 1 - sstep(0.35, 0.95, tm);
   scrubTrail =
     guiParams.morphTrailBoost * dissolveState.v * (1 - dissolveState.v);
@@ -1533,6 +1674,19 @@ const updateMorph = (timeSec) => {
   morphMesh.visible = show;
   if (show && morphData) {
     const d = morphData;
+    // One matter: particles are whole pixels of the SAME screen grain as
+    // the sphere's cells, and they launch from / dock into SLOTS of the
+    // ball's own lattice. The lattice of the ball currently on screen is
+    // anchored at the LIVE mesh position (hover offset included) so a
+    // landed pixel sits exactly on the grid the reassembling ball paints.
+    const worldPerPx = viewportWorldH / ch;
+    const cellA = matterGrainPx(rAv / worldPerPx) * worldPerPx;
+    const cellB = matterGrainPx(rBv / worldPerPx) * worldPerPx;
+    const anchorAX = atA ? mesh.position.x : A.x;
+    const anchorAY = atA ? mesh.position.y : A.y;
+    const anchorBX = atA ? B.x : mesh.position.x;
+    const anchorBY = atA ? B.y : mesh.position.y;
+    const snap = (v, cell) => (Math.floor(v / cell) + 0.5) * cell;
     for (let i = 0; i < MORPH_COUNT; i++) {
       const i3 = i * 3;
       const dax = d.dirA[i3];
@@ -1550,16 +1704,26 @@ const updateMorph = (timeSec) => {
       const t1 = 0.45 + 0.12 * d.stag[i] + 0.28 * kB; // dock ∈ [0.45, 0.85]
       const p = sstep(t0, Math.max(t0 + 0.25, t1), tm);
 
-      // Departure / arrival points live on the two sphere surfaces
-      const ax = A.x + dax * rA;
-      const ay = A.y + day * rA;
-      const bx = B.x + d.dirB[i3] * rB;
-      const by = B.y + d.dirB[i3 + 1] * rB;
-      // Flight-shaped motion: individual sagging arc + serpentine wobble
-      // whose phase CRAWLS with time (the parked swarm keeps undulating),
-      // + a slow along-travel drift — all zero at the endpoints.
+      // Departure / arrival = SLOTS on the two balls' pixel lattices —
+      // a pixel lifts off from its own grid cell and seats into a grid
+      // cell of the reformed ball, never in between.
+      const ax = anchorAX + snap(dax * rAv, cellA);
+      const ay = anchorAY + snap(day * rAv, cellA);
+      const bx = anchorBX + snap(d.dirB[i3] * rBv, cellB);
+      const by = anchorBY + snap(d.dirB[i3 + 1] * rBv, cellB);
+      // Flight-shaped motion: individual arc + serpentine wobble whose
+      // phase CRAWLS with time (the parked swarm keeps undulating), + a
+      // slow along-travel drift — all zero at the endpoints.
+      // Ungated (page-transition) flights damp the droop hard: the stream
+      // must read as a STRAIGHT A→B current (never leaving the screen,
+      // never a detour) — the ribbon stagger and the steady tween pace do
+      // the "scroll morph" feel, not the trajectory.
       const flight = Math.sin(p * Math.PI);
-      const sag = flight * guiParams.morphArcSag * d.sag[i];
+      const arc =
+        -flight *
+        guiParams.morphArcSag *
+        d.sag[i] *
+        (morphState.gated ? 1 : 0.35);
       const wob =
         Math.sin(
           p * d.wobFreq[i] * Math.PI * 2 +
@@ -1582,20 +1746,29 @@ const updateMorph = (timeSec) => {
         ay +
           (by - ay) * p +
           perpY * wob +
-          morphTravel.y * drift -
-          sag,
-        (d.dirA[i3 + 2] + (d.dirB[i3 + 2] - d.dirA[i3 + 2]) * p) * rA,
+          morphTravel.y * drift +
+          arc,
+        // z bulge only mid-flight: both endpoints stay on the z=0 plane
+        // so the projected pixel lands EXACTLY on its lattice slot (a z
+        // offset would parallax-shift and rescale it off the grid).
+        (d.dirA[i3 + 2] + (d.dirB[i3 + 2] - d.dirA[i3 + 2]) * p) *
+          (rAv + (rBv - rAv) * p) *
+          flight,
       );
-      // Airborne envelope + shader-style shimmer: each pixel breathes
-      // in size like the sphere's hash-flickering cells, only in flight.
-      const env = sstep(0, 0.06, p) * (1 - sstep(0.92, 1, p));
-      const shimmer =
-        1 -
-        guiParams.morphShimmer *
-          flight *
-          (0.5 + 0.5 * Math.sin(timeSec * 1.6 + d.wobPhase[i] * 9.0));
+      // A pixel is binary matter: it POPS at full size on launch and
+      // vanishes as it seats — the same language as the shader's hash
+      // spray. In flight, a small fraction blink off for one tick (hash
+      // flicker, like the sphere's cells) — never a continuous breath.
+      const tick = Math.floor(timeSec * 8 + d.stag[i] * 8);
+      const hb = Math.sin(i * 127.1 + tick * 311.7) * 43758.5;
+      const blink =
+        hb - Math.floor(hb) < guiParams.morphShimmer * 0.45 * flight ? 0 : 1;
+      const airborne = p > 0.0001 && p < 0.9999 ? 1 : 0;
       morphDummy.scale.setScalar(
-        Math.max(1e-4, env * shimmer * d.size[i] * (rA + (rB - rA) * p)),
+        Math.max(
+          1e-4,
+          airborne * blink * d.size[i] * (cellA + (cellB - cellA) * p),
+        ),
       );
       morphDummy.updateMatrix();
       morphMesh.setMatrixAt(i, morphDummy.matrix);
@@ -1832,10 +2005,25 @@ defineExpose({
   mode,
   setScrubPosition,
   clearScrub,
+  hold,
+  getSelfAnchor,
   setExpression,
   wink,
   glance,
   setDissolve,
+  getDissolve: () => dissolveState.v,
+  // Ball center + visual radius in viewport CSS px (y top-down) — lets the
+  // page transition seed its radial wall wavefront on the character.
+  getScreenPosition: () => {
+    if (!renderer || !camera || !mesh) return null;
+    const cw = renderer.domElement.clientWidth || window.innerWidth;
+    const ch = renderer.domElement.clientHeight || window.innerHeight;
+    return {
+      x: (mesh.position.x / (viewportWorldH * camera.aspect) + 0.5) * cw,
+      y: (0.5 - mesh.position.y / viewportWorldH) * ch,
+      r: ((mesh.scale.y * geoRadius) / viewportWorldH) * ch,
+    };
+  },
   dissolveTo,
   morphScrub,
   getCamera: () => camera,
@@ -1879,6 +2067,9 @@ onBeforeUnmount(() => {
   width: 100vw;
   height: 100vh;
   pointer-events: none; /* laisse passer les clics au contenu en dessous */
-  z-index: 100; /* au-dessus de tout sauf les éléments UI importants */
+  /* Au-dessus du mur de pixels (PixelGridOverlay, 9999) : pendant une
+     transition le smiley reste visible et voyage PAR-DESSUS la grid —
+     il est l'acteur de la transition, jamais enseveli sous elle. */
+  z-index: 10000;
 }
 </style>

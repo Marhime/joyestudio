@@ -34,6 +34,12 @@ interface FadeUpOptions {
   start?: string;
   yPercent?: number;
   ease?: string;
+  /**
+   * Default 'play none none reverse': every reveal on the site replays on
+   * re-entry — coherent with the smiley morphs, which are scrubbed and
+   * fully reversible. Override for one-shot cases.
+   */
+  toggleActions?: string;
 }
 
 /**
@@ -47,6 +53,7 @@ export function fadeUp(ctx: RevealContext, opts: FadeUpOptions = {}) {
     start = "top 80%",
     yPercent = 15,
     ease = "power3.out",
+    toggleActions = "play none none reverse",
   } = opts;
 
   const targets = children ? ctx.el.querySelectorAll(children) : [ctx.el];
@@ -63,6 +70,7 @@ export function fadeUp(ctx: RevealContext, opts: FadeUpOptions = {}) {
     scrollTrigger: {
       trigger: ctx.el,
       start,
+      toggleActions,
       invalidateOnRefresh: true,
     },
   });
@@ -79,6 +87,8 @@ interface SplitRevealOptions {
   start?: string;
   yPercent?: number;
   ease?: string;
+  /** Default 'play none none reverse' — see FadeUpOptions.toggleActions. */
+  toggleActions?: string;
 }
 
 /**
@@ -93,6 +103,7 @@ export function splitReveal(ctx: RevealContext, opts: SplitRevealOptions = {}) {
     start = "top 80%",
     yPercent = 100,
     ease = "power3.out",
+    toggleActions = "play none none reverse",
   } = opts;
 
   const elements = targets ? ctx.el.querySelectorAll(targets) : [ctx.el];
@@ -119,6 +130,7 @@ export function splitReveal(ctx: RevealContext, opts: SplitRevealOptions = {}) {
       scrollTrigger: {
         trigger: element,
         start,
+        toggleActions,
         invalidateOnRefresh: true,
       },
     });

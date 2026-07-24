@@ -10,7 +10,7 @@
             love to own
           </h1>
         </div>
-        <div hiye-face ref="hiyeRef" class="hiye">
+        <div hiye-face data-smiley-entry ref="hiyeRef" class="hiye">
           <img
             class="hife--face"
             src="~/assets/images/HiYe2.png"
@@ -188,7 +188,7 @@ const heroContentRef = useTemplateRef<HTMLDivElement>("heroContentRef");
 const buttonWrapperRef = useTemplateRef<HTMLDivElement>("buttonWrapperRef");
 
 // ── GSAP ─────────────────────────────────────────────────────────────────────
-const { gsap, Flip, mm, BP, scheduleRefresh } = useGSAP();
+const { gsap, Flip, SplitText, mm, BP, scheduleRefresh } = useGSAP();
 const { $lenis: lenis } = useNuxtApp() as any;
 
 // ── Page enter hook (provided by app.vue via usePageTransition) ────────────────
@@ -203,7 +203,9 @@ onMounted(() => {
       gsap.set(logoLeftRef.value, { autoAlpha: 0, xPercent: -12 });
       gsap.set(logoRightRef.value, { autoAlpha: 0, xPercent: 12 });
       gsap.set(hiyeRef.value, { autoAlpha: 0, scale: 0.93 });
-      gsap.set(heroContentRef.value, { autoAlpha: 0, yPercent: 6 });
+      // Container hidden by opacity only — the headline's own masked lines
+      // own the vertical motion (revealed in onPageEnter, once fonts are set).
+      gsap.set(heroContentRef.value, { autoAlpha: 0 });
       gsap.set(buttonWrapperRef.value, { autoAlpha: 0, yPercent: 8 });
       return () => {};
     });
@@ -256,7 +258,16 @@ onMounted(() => {
       };
 
       mm.add(BP.desktop, () => {
-        gsap
+        // Headline reveal shares the sections' signature: masked lines rise.
+        // Split here (after grid dissolve) so line breaks are measured with
+        // fonts already applied.
+        const h1 = heroContentRef.value?.querySelector("h1");
+        const h1Split = h1
+          ? new SplitText(h1, { type: "lines", mask: "lines" })
+          : null;
+        if (h1Split) gsap.set(h1Split.lines, { yPercent: 110 });
+
+        const tl = gsap
           .timeline({ onComplete: afterEntrance })
           .to(logoLeftRef.value, {
             autoAlpha: 1,
@@ -269,16 +280,26 @@ onMounted(() => {
             { autoAlpha: 1, xPercent: 0, duration: 1.2, ease: "power3.out" },
             "<0.1",
           )
-          .to(
-            heroContentRef.value,
-            { autoAlpha: 1, yPercent: 0, duration: 0.9, ease: "power3.out" },
-            "-=0.6",
-          )
-          .to(
-            buttonWrapperRef.value,
-            { autoAlpha: 1, yPercent: 0, duration: 0.7, ease: "power3.out" },
-            "-=0.5",
+          // Container revealed by opacity; its lines carry the rise
+          .set(heroContentRef.value, { autoAlpha: 1 }, "-=0.6");
+
+        if (h1Split)
+          tl.to(
+            h1Split.lines,
+            {
+              yPercent: 0,
+              duration: 0.9,
+              ease: "power3.out",
+              stagger: 0.12,
+            },
+            "<",
           );
+
+        tl.to(
+          buttonWrapperRef.value,
+          { autoAlpha: 1, yPercent: 0, duration: 0.7, ease: "power3.out" },
+          "-=0.5",
+        );
         return () => {};
       });
 

@@ -1,5 +1,5 @@
 <template>
-  <footer>
+  <footer ref="footerRef">
     <div class="grid-container">
       <div class="grid">
         <div class="first-column">
@@ -56,6 +56,86 @@ import Joye from "../icons/Joye.vue";
 import JoyeStud from "../icons/JoyeStud.vue";
 import LogoFull from "../icons/LogoFull.vue";
 import Studio from "../icons/Studio.vue";
+import { useGSAP } from "~/composables/useGSAP";
+import { useAnimationBus } from "~/composables/useAnimationBus";
+
+const footerRef = useTemplateRef<HTMLElement>("footerRef");
+const { gsap, mm, BP, scheduleRefresh } = useGSAP();
+const { on } = useAnimationBus();
+
+// Footer reveal — the site's signature masked-rise grammar: link columns
+// stagger up, then the giant wordmark rises as it enters. Reversible on
+// scroll-back like every reveal on the site.
+const setupReveals = () => {
+  if (!footerRef.value) return;
+  mm.revert();
+
+  const revealIn = (logoSelector: string) => {
+    const el = footerRef.value!;
+    const cols = el.querySelectorAll(
+      ".first-column, .second-column, .third-column, .fourth-column",
+    );
+    const logo = el.querySelector(logoSelector);
+
+    if (cols.length) {
+      gsap.set(cols, { autoAlpha: 0, yPercent: 18 });
+      gsap.to(cols, {
+        autoAlpha: 1,
+        yPercent: 0,
+        duration: 0.8,
+        stagger: 0.07,
+        ease: "power3.out",
+        scrollTrigger: {
+          trigger: el,
+          start: "top 82%",
+          toggleActions: "play none none reverse",
+          invalidateOnRefresh: true,
+        },
+      });
+    }
+    if (logo) {
+      gsap.set(logo, { autoAlpha: 0, yPercent: 14 });
+      gsap.to(logo, {
+        autoAlpha: 1,
+        yPercent: 0,
+        duration: 1.1,
+        ease: "power3.out",
+        scrollTrigger: {
+          trigger: logo,
+          start: "top 92%",
+          toggleActions: "play none none reverse",
+          invalidateOnRefresh: true,
+        },
+      });
+    }
+    return () => {};
+  };
+
+  mm.add(BP.desktop, () => revealIn(".logo-desktop"));
+  mm.add(BP.mobile, () => revealIn(".logo-mobile"));
+  mm.add(BP.reducedMotion, () => {
+    const el = footerRef.value!;
+    gsap.set(
+      el.querySelectorAll(
+        ".first-column, .second-column, .third-column, .fourth-column, .logo-desktop, .logo-mobile",
+      ),
+      { clearProps: "all" },
+    );
+    return () => {};
+  });
+
+  scheduleRefresh();
+};
+
+onMounted(() => {
+  nextTick(setupReveals);
+});
+
+// The footer lives in the persistent layout, but page transitions kill ALL
+// ScrollTriggers on leave — rebuild ours once the new page has entered.
+on("page:afterEnter", () => {
+  nextTick(setupReveals);
+});
 </script>
 
 <style lang="scss" scoped>

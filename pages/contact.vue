@@ -14,6 +14,7 @@
       <div
         ref="anchorRef"
         contact-smiley-anchor
+        data-smiley-entry
         data-smiley-scale="1"
         data-smiley-yaw="-16"
         data-smiley-pitch="12"
@@ -48,13 +49,16 @@ const smiley = useSmiley();
 
 // ── Page enter hook (provided by app.vue via usePageTransition) ────────────────
 const onPageEnter = inject<PageEnterHook>("onPageEnter")!;
+const isTransitioning = inject<Ref<boolean>>("isTransitioning", ref(false));
 
 onMounted(() => {
   nextTick(() => {
     // Track the smiley anchor immediately so the smiley doesn't flash at the
-    // viewport center on direct page load (before InteractiveForm.start()
-    // fires its own track() ~1.5s into the entrance timeline).
-    if (anchorRef.value) smiley.track(anchorRef.value);
+    // viewport center on DIRECT page load only. During a transition the
+    // actor owns the ball (held above the wall, then the flight) — a mount
+    // track here would teleport him mid-hold.
+    if (anchorRef.value && !isTransitioning.value)
+      smiley.track(anchorRef.value);
 
     // ① Initial hidden states — set while grid covers the screen.
     //    Must be inside mm.add so they're breakpoint-aware and auto-reverted.

@@ -170,7 +170,6 @@ const setupAnimations = () => {
       const track = gsap.timeline({
         scrollTrigger: {
           trigger: servicesWrapper,
-          markers: true,
           start: i === 0 ? "top 80%" : () => `top+=${(i - 1) * cardHeight} top`,
           end: i === 0 ? "top top" : () => `+=${cardHeight}`,
           scrub: 1,
